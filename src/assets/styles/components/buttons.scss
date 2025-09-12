@@ -1,0 +1,86 @@
+// Button styles
+// Buttons
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  // padding: var(--spacing-3) var(--spacing-5);
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+  cursor: pointer;
+  transition: var(--transition-base);
+  white-space: nowrap;
+  line-height: 21px;
+  min-height: 40px;
+  
+  &--primary {
+    background-color: var(--color-primary);
+    color: var(--color-white);
+    border: 1px solid transparent;
+    a.link{
+      text-decoration: none;
+      color: var(--color-white);
+      display: flex;
+    justify-content: center;
+    align-items: center;
+    }
+    .btn__icon{
+      filter: brightness(0) invert(1);
+    }
+    
+    &:hover {
+      background-color: var(--color-white);
+      color: var(--color-primary);
+      border: 1px solid var(--color-primary);
+      img.btn__icon{
+        filter: invert(43%) sepia(83%) saturate(1421%) hue-rotate(152deg) brightness(95%) contrast(94%);
+      }
+      a.link{
+        color: var(--color-primary);
+        img.btn__icon{
+          filter: invert(43%) sepia(83%) saturate(1421%) hue-rotate(152deg) brightness(95%) contrast(94%);
+        }
+      }
+    }
+  }
+  
+  &--secondary {
+    // background-color: var(--color-gray-100);
+    color: var(--color-white);
+    background-color: var(--color-pri);
+    a.link{
+      text-decoration: none;
+      color: var(--color-white);
+    }
+    // border: 1px solid var(--color-gray-300);
+    
+    &:hover {
+      background-color: var(--color-gray-300);
+    }
+  }
+
+  &--third {
+    color: var(--color-gray-600);
+    background-color: #D9D9D9;
+    border: 1px solid transparent;
+    a.link{
+      text-decoration: none;
+      color: var(--color-gray-600);
+    }
+    
+    &:hover {
+      background-color: var(--color-white);
+      border: 1px solid #000;
+    }
+  }
+
+  
+  &__icon {
+    width: 24px;
+    height: 24px;
+  }
+}

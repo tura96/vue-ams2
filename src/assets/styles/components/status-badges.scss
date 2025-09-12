@@ -1,0 +1,139 @@
+// Status badge styles
+// Asset Tag
+.asset-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  font-weight: var(--font-weight-normal);
+  color: var(--color-gray-600);
+  
+  &__copy {
+    width: 16px;
+    height: 16px;
+    opacity: 0.5;
+    cursor: pointer;
+    transition: var(--transition-base);
+    margin-left: 10px;
+    
+    &:hover {
+      opacity: 1;
+    }
+  }
+}
+
+// Status
+.status {
+  display: inline-flex;
+  align-items: center;
+  // padding: var(--spacing-1) var(--spacing-3);
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-normal);
+  text-transform: capitalize;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  vertical-align:middle;
+  
+  &--new {
+    background-color: #4ECCB11A;
+    color: var(--color-status-new);
+  }
+  
+  &--staging {
+    background-color: #38BDF81A;
+    color: var(--color-status-staging);
+  }
+  
+  &--ready {
+    background-color: #1665341A;
+    color: var(--color-status-ready);
+  }
+  
+  &--deployed {
+    background-color: #1E40AF1A;
+    color: var(--color-status-deployed);
+  }
+  
+  &--defected {
+    background-color: #D24F531A;
+    color: var(--color-status-defected);
+  }
+  
+  &--maintenance {
+    background-color: #FF934F1A;
+    color: var(--color-status-maintenance);
+  }
+  
+  &--archived {
+    background-color: rgba(108, 117, 125, 0.1);
+    color: var(--color-status-archived);
+  }
+  
+  &--disposed {
+    background-color: #D217511A;
+    color: var(--color-status-disposed);
+  }
+  &--return {
+    color: var(--color-status-return);
+    background-color: #A78BFA1A;
+  }
+}
+
+// Actions
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  
+  &__btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: none;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: var(--transition-base);
+    position: relative;
+    &:hover {
+      background-color: var(--color-gray-100);
+    }
+  }
+
+  &__tooltip {
+    visibility: hidden;
+    // width: 120px;
+    background-color: black;
+    color: #fff;
+    text-align: center;
+    border-radius: 6px;
+    // padding: 5px 0;
+    padding: 5px 4px;
+    
+    /* Position the tooltip */
+    position: absolute;
+    z-index: 1;
+    bottom: 100%;
+    // left: 50%;
+    // margin-left: -60px;
+    left: 40%;
+    margin-left: -50%;
+    .actions__btn:hover & {
+      visibility: visible;
+    }
+  }
+  
+  &__icon {
+    width: 24px;
+    height: 24px;
+    // opacity: 0.6;
+    // transition: var(--transition-base);
+    
+    .actions__btn:hover & {
+      opacity: 1;
+    }
+  }
+}
