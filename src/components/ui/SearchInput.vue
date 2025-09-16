@@ -4,13 +4,13 @@
       src="@/assets/images/icons/mdi_search.svg" 
       alt="Search" 
       class="search__icon" 
+      @click="onSearchClick"
     />
 
     <input 
       type="text" 
       :placeholder="computedPlaceholder" 
       :value="modelValue" 
-      @input="onInput"
       class="search__input input-floating__field"
       id="search"
     />
@@ -20,27 +20,33 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
-// Define props with TypeScript types
+// Props
 const props = defineProps<{
   modelValue: string;
   placeholder?: string;
   label?: string;
 }>();
 
-// Define emits
+// Emits
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void;
 }>();
 
-// Fallback for label and placeholder using computed properties
+// Local input ref
+const inputRef = ref<HTMLInputElement | null>(null);
+
+// Computed values
 const computedLabel = computed(() => props.label || 'Search');
 const computedPlaceholder = computed(() => props.placeholder || 'Search...');
 
-// Handle input event
-function onInput(event: Event) {
-  emit('update:modelValue', (event.target as HTMLInputElement).value);
+// Icon click handler
+function onSearchClick() {
+  if (inputRef.value) {
+    emit('update:modelValue', inputRef.value.value);
+    console.log('Search icon clicked, input value emitted:', inputRef.value.value);
+  }
 }
 </script>
 

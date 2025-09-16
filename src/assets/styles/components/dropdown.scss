@@ -215,6 +215,7 @@
     transition: var(--transition-base);
     border-bottom: 1px solid var(--color-gray-100);
     color: var(--color-gray-700);
+    text-transform: capitalize;
 
     &:hover {
       background-color: var(--color-gray-50);

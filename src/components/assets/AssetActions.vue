@@ -4,7 +4,7 @@
       <img src="/assets/images/icons/mdi_eye-outline.svg" alt="View" class="actions__icon">
       <span class="actions__tooltip">Detail</span>
     </button>
-    <button class="actions__btn" @click="$emit('edit')">
+    <button class="actions__btn" @click="$emit('view')">
       <img src="/assets/images/icons/mdi_edit-outline.svg" alt="Edit" class="actions__icon">
       <span class="actions__tooltip">Edit</span>
     </button>

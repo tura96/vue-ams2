@@ -64,7 +64,7 @@ function toggleSidebar() {
 
 .app-content {
   flex: 1;
-  padding: 1.5rem;
+  padding: 34px;
   overflow-y: auto;
   background: var(--bg-secondary);
   @media screen and (max-width: 1200px) {

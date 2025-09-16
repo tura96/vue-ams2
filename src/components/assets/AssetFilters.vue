@@ -1,6 +1,6 @@
 <template>
   <div class="content__toolbar">
-    <SearchInput v-model="filters.search" placeholder="Search" />
+    <SearchInput v-model="filters.search" :placeholder="Search" />
 
     <div class="filters">
       <CustomSelect 
@@ -46,6 +46,14 @@ interface Option {
   label: string
 }
 
+// --- Props ---
+const props = defineProps<{
+  statusOptions: Option[]
+  modelOptions: Option[]
+  storeOptions: Option[]
+  placeholder?: string
+}>()
+
 // --- Emits ---
 const emit = defineEmits<{
   (e: 'filter-change', filters: Filters): void
@@ -59,25 +67,6 @@ const filters = ref<Filters>({
   store: ''
 })
 
-const statusOptions: Option[] = [
-  { value: 'available', label: 'Available' },
-  { value: 'deployed', label: 'Deployed' },
-  { value: 'maintenance', label: 'Under Maintenance' },
-  { value: 'defected', label: 'Defected' }
-]
-
-const modelOptions: Option[] = [
-  { value: 'L3150', label: 'L3150' },
-  { value: 'X1', label: 'ThinkPad X1' },
-  { value: 'M404', label: 'M404' }
-]
-
-const storeOptions: Option[] = [
-  { value: 'it-room', label: 'IT Room' },
-  { value: 'office-3', label: 'Office 3' },
-  { value: 'office-4', label: 'Office 4' }
-]
-
 // --- Watch ---
 watch(filters, (newFilters) => {
   emit('filter-change', newFilters)
@@ -85,10 +74,10 @@ watch(filters, (newFilters) => {
 
 // --- Methods ---
 function applyBulkAction() {
-  // Bulk action logic placeholder
-  console.log('Bulk deploy action triggered', filters.value)
+  console.log('Bulk deploy action triggered', props)
 }
 </script>
+
 <style scoped lang="scss">
-  @use "/src/assets/styles/components/table.scss";
+@use "/src/assets/styles/components/table.scss";
 </style>

@@ -12,8 +12,8 @@
               type="text" 
               id="assetTag" 
               class="input-floating__field" 
-              placeholder="Asset Tag"
-              v-model="asset.asset_tag"
+              placeholder="assetTag"
+              v-model="asset.tag"
               ref="assetTagInput"
             >
             <label for="assetTag" class="input-floating__label">Asset Tag</label>
@@ -31,8 +31,8 @@
               type="text" 
               id="serialNumber" 
               class="input-floating__field" 
-              placeholder="Serial Number"
-              v-model="asset.serial_number"
+              placeholder="serialNumber"
+              v-model="asset.serial"
               ref="serialInput"
             >
             <label for="serialNumber" class="input-floating__label">Serial Number</label>
@@ -59,11 +59,11 @@
               id="purchaseDate" 
               class="input-floating__field inputdate" 
               placeholder="Purchase Date"
-              v-model="asset.purchase_date"
+              v-model="asset.purchaseDate"
               ref="purchaseDateInput"
             >
             <label for="purchaseDate" class="input-floating__label">Purchase Date</label>
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none" class="btn-reset date-reset" title="Clear" v-if="asset.purchase_date" @click="clearDate('purchase_date')">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none" class="btn-reset date-reset" title="Clear" v-if="asset.purchaseDate" @click="clearDate('purchaseDate')">
               <path d="M15.707 5.70703L11.4141 10L15.707 14.293L14.293 15.707L10 11.4141L5.70703 15.707L4.29297 14.293L8.58594 10L4.29297 5.70703L5.70703 4.29297L10 8.58594L14.293 4.29297L15.707 5.70703Z" fill="#44424B"></path>
             </svg>
           </div>
@@ -73,8 +73,8 @@
               type="number" 
               id="cost" 
               class="input-floating__field" 
-              placeholder="Cost"
-              v-model="asset.purchase_cost"
+              placeholder="cost"
+              v-model="asset.cost"
               ref="costInput"
             >
             <label for="cost" class="input-floating__label">Cost</label>
@@ -87,11 +87,11 @@
               id="warrantyExpiry" 
               class="input-floating__field inputdate" 
               placeholder="Warranty Expiry"
-              v-model="asset.warranty_expiry"
+              v-model="asset.warrantyExpiry"
               ref="warrantyInput"
             >
             <label for="warrantyExpiry" class="input-floating__label">Warranty Expiry</label>
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none" class="btn-reset date-reset" title="Clear" v-if="asset.warranty_expiry" @click="clearDate('warranty_expiry')">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none" class="btn-reset date-reset" title="Clear" v-if="asset.warrantyExpiry" @click="clearDate('warrantyExpiry')">
               <path d="M15.707 5.70703L11.4141 10L15.707 14.293L14.293 15.707L10 11.4141L5.70703 15.707L4.29297 14.293L8.58594 10L4.29297 5.70703L5.70703 4.29297L10 8.58594L14.293 4.29297L15.707 5.70703Z" fill="#44424B"></path>
             </svg>
           </div>
@@ -101,8 +101,8 @@
               type="text" 
               id="rfidTag" 
               class="input-floating__field" 
-              placeholder="RFID Tag ID"
-              v-model="asset.rfid_tag"
+              placeholder="rfidTag"
+              v-model="asset.rfidTag"
               ref="rfidInput"
             >
             <label for="rfidTag" class="input-floating__label">RFID Tag ID</label>
@@ -116,7 +116,7 @@
         
         <div class="item-detail__form-grid">
           <CustomSelect 
-            v-model="asset.assigned_to"
+            v-model="asset.store"
             label="Deployed To (Store)"
             :options="storeOptions"
             ref="storeSelect"
@@ -161,19 +161,27 @@
 <script lang="ts" setup>
 import { ref, reactive, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import flatpickr from 'flatpickr'
-import 'flatpickr/dist/flatpickr.css'
-import '@/assets/styles/items.scss'
+import flatpickr from 'flatpickr';
+import "flatpickr/dist/flatpickr.css";
+import "@/assets/styles/items.scss";
 import CustomSelect from '@/components/ui/CustomSelect.vue'
-import { amsApi, type Asset, type AssetCreateData} from '../services/amsApi'
 
-interface SelectOption {
-  value: string
-  label: string
+interface Asset {
+  tag: string
+  model: string
+  serial: string
+  status: string
+  purchaseDate: string
+  cost: string | number
+  warrantyExpiry: string
+  rfidTag: string
+  store: string
+  location: string
+  notes: string
 }
 
 const props = defineProps<{
-  id?: string | number | null
+  assetId?: string | number | null
 }>()
 
 const router = useRouter()
@@ -194,39 +202,57 @@ let purchaseDatePicker: any = null
 let warrantyDatePicker: any = null
 
 const asset = reactive<Asset>({
-  id: 0,
-  title: '',
-  description: '',
-  asset_tag: '',
+  tag: '',
   model: '',
-  serial_number: '',
-  status: 'new',
-  assigned_to: '',
-  location: '',
+  serial: '',
+  status: '',
+  purchaseDate: '',
+  cost: '',
+  warrantyExpiry: '',
+  rfidTag: '',
   store: '',
-  warranty_expiry: '',
-  notes: '',
-  purchase_date: '',
-  purchase_cost: 0,
-  date_created: '',
-  date_modified: '',
-  rfid_tag: ''
+  location: '',
+  notes: ''
 })
 
-const modelOptions = ref<SelectOption[]>([])
-const statusOptions = ref<SelectOption[]>([])
-const storeOptions = ref<SelectOption[]>([])
-const locationOptions = ref<SelectOption[]>([])
+const modelOptions = [
+  { value: 'dell-latitude-5440', label: 'Dell Latitude 5440' },
+  { value: 'hp-laserjet-m404', label: 'HP LaserJet Pro M404' },
+  { value: 'lenovo-thinkpad-x1', label: 'Lenovo ThinkPad X1' },
+  { value: 'pc', label: 'PC' }
+]
+
+const statusOptions = [
+  { value: 'available', label: 'Available' },
+  { value: 'deployed', label: 'Deployed' },
+  { value: 'maintenance', label: 'Under Maintenance' },
+  { value: 'defected', label: 'Defected' }
+]
+
+const storeOptions = [
+  { value: 'store-a', label: 'Store A' },
+  { value: 'store-b', label: 'Store B' },
+  { value: 'store-c', label: 'Store C' },
+  { value: 'store-d', label: 'Store D' }
+]
+
+const locationOptions = [
+  { value: 'office-3', label: 'Office 3' },
+  { value: 'office-4', label: 'Office 4' },
+  { value: 'it-room', label: 'IT Room' },
+  { value: 'kitchen', label: 'Kitchen' }
+]
 
 // Update field classes based on value
 const updateFieldClasses = () => {
+  // Text inputs
   const textInputs = [
-    { element: assetTagInput.value, value: asset.asset_tag, className: 'input-floating__field--has-value' },
-    { element: serialInput.value, value: asset.serial_number, className: 'input-floating__field--has-value' },
-    { element: costInput.value, value: asset.purchase_cost, className: 'input-floating__field--has-value' },
-    { element: rfidInput.value, value: asset.rfid_tag, className: 'input-floating__field--has-value' },
-    { element: purchaseDateInput.value, value: asset.purchase_date, className: 'input-floating__field--has-value' },
-    { element: warrantyInput.value, value: asset.warranty_expiry, className: 'input-floating__field--has-value' },
+    { element: assetTagInput.value, value: asset.tag, className: 'input-floating__field--has-value' },
+    { element: serialInput.value, value: asset.serial, className: 'input-floating__field--has-value' },
+    { element: costInput.value, value: asset.cost, className: 'input-floating__field--has-value' },
+    { element: rfidInput.value, value: asset.rfidTag, className: 'input-floating__field--has-value' },
+    { element: purchaseDateInput.value, value: asset.purchaseDate, className: 'input-floating__field--has-value' },
+    { element: warrantyInput.value, value: asset.warrantyExpiry, className: 'input-floating__field--has-value' },
     { element: notesInput.value, value: asset.notes, className: 'multiselect-floating__field--has-value' }
   ]
   
@@ -240,6 +266,7 @@ const updateFieldClasses = () => {
     }
   })
   
+  // Select inputs
   const selectInputs = [
     { element: modelSelect.value, value: asset.model },
     { element: statusSelect.value, value: asset.status },
@@ -264,144 +291,74 @@ const updateFieldClasses = () => {
 // Watch for changes in asset properties
 watch(() => asset, () => {
   updateFieldClasses()
+  // console.log('New value: ',newValue)
 }, { deep: true })
 
-// Fetch metadata for dropdowns
-const fetchMetadata = async () => {
-  try {
-    // Fetch models
-    const modelsResponse = await amsApi.getModels()
-    if (modelsResponse.success && modelsResponse.data) {
-      modelOptions.value = modelsResponse.data.map(model => ({
-        value: model,
-        label: model
-      }))
-    }
-
-    // Fetch statuses
-    const statusesResponse = await amsApi.getStatuses()
-    if (statusesResponse.success && statusesResponse.data) {
-      statusOptions.value = Object.entries(statusesResponse.data).map(([value, label]) => ({
-        value,
-        label
-      }))
-    }
-
-    // Fetch locations (assuming stores are fetched from locations endpoint)
-    const locationsResponse = await amsApi.getLocations()
-    if (locationsResponse.success && locationsResponse.data) {
-      locationOptions.value = locationsResponse.data.map(location => ({
-        value: location,
-        label: location
-      }))
-
-    }
-    // Fetch locations (assuming stores are fetched from locations endpoint)
-    const assignedResponse = await amsApi.getAssigned()
-    if (assignedResponse.success && assignedResponse.data) {
-      storeOptions.value = assignedResponse.data.map(assigned_to => ({
-        value: assigned_to,
-        label: assigned_to
-      }))
-    }
-
-  } catch (error) {
-    console.error('Error fetching metadata:', error)
-    alert('Failed to load dropdown options')
-  }
-}
-
 // Load asset data if editing
-const loadAssetData = async () => {
-  if (props.id) {
-    try {
-      const response = await amsApi.getAsset(Number(props.id))
-      if (response.success && response.data) {
-        Object.assign(asset, response.data)
-        // Ensure optional fields are set to empty string if undefined
-        asset.description = asset.description || ''
-        asset.assigned_to = asset.assigned_to || ''
-        asset.location = asset.location || ''
-        asset.store = asset.store || ''
-        asset.warranty_expiry = asset.warranty_expiry || ''
-        asset.notes = asset.notes || ''
-        asset.purchase_date = asset.purchase_date || ''
-        asset.purchase_cost = asset.purchase_cost || 0
-        asset.rfid_tag = asset.rfid_tag || ''
-        // Update classes after data is loaded
-        nextTick(() => {
-          updateFieldClasses()
-        })
-      }
-    } catch (error) {
-      console.error('Error fetching asset:', error)
-      alert('Failed to load asset data')
+const loadAssetData = () => {
+  if (props.assetId) {
+    // In a real app, this would be an API call
+    const sampleData: Asset = {
+      tag: 'AST-0001',
+      model: 'dell-latitude-5440',
+      serial: 'SN-DL5440-1234',
+      status: 'available',
+      purchaseDate: '2023-05-15',
+      cost: '1200',
+      warrantyExpiry: '2025-05-15',
+      rfidTag: 'RFID-001',
+      store: 'store-a',
+      location: 'office-3',
+      notes: 'Ready to use'
     }
+    Object.assign(asset, sampleData)
+    
+    // Update classes after data is loaded
+    nextTick(() => {
+      updateFieldClasses()
+    })
   }
 }
 
 const goBack = () => {
+  // router.back()
   router.push('/')
 }
 
-const saveAsset = async () => {
+const saveAsset = () => {
   // Validate required fields
-  if (!asset.asset_tag || !asset.model || !asset.serial_number) {
-    alert('Please fill in all required fields (Asset Tag, Model, Serial Number)')
+  if (!asset.tag || !asset.model || !asset.serial) {
+    alert('Please fill in all required fields')
     return
   }
 
   // Prepare data for saving
-  const assetData: AssetCreateData = {
-    title: asset.title || `Asset ${asset.asset_tag}`,
-    description: asset.description,
-    asset_tag: asset.asset_tag,
-    model: asset.model,
-    serial_number: asset.serial_number,
-    status: asset.status,
-    assigned_to: asset.assigned_to || undefined,
-    location: asset.location || undefined,
-    store: asset.store || undefined,
-    warranty_expiry: asset.warranty_expiry || undefined,
-    notes: asset.notes || undefined,
-    purchase_date: asset.purchase_date || undefined,
-    purchase_cost: asset.purchase_cost || undefined,
-    rfid_tag: asset.rfid_tag || undefined
+  const assetData = {
+    ...asset,
+    id: props.assetId || Date.now() // Generate ID if new asset
   }
 
-  try {
-    if (props.id) {
-      // Update existing asset
-      const response = await amsApi.updateAsset(Number(props.id), assetData)
-      if (response.success) {
-        alert('Asset updated successfully!')
-        router.push('/')
-      }
-    } else {
-      // Create new asset
-      const response = await amsApi.createAsset(assetData)
-      if (response.success) {
-        alert('Asset created successfully!')
-        router.push('/')
-      }
-    }
-  } catch (error) {
-    console.error('Error saving asset:', error)
-    // alert(`Failed to save asset: ${error.message}`)
-  }
+  // In a real app, this would be an API call
+  console.log('Saving asset:', assetData)
+  
+  // Simulate API call
+  setTimeout(() => {
+    alert(props.assetId ? 'Asset updated successfully!' : 'Asset created successfully!')
+    // router.push('/assets')
+  }, 500)
 }
 
 // Clear date picker field
-const clearDate = (field: 'purchase_date' | 'warranty_expiry') => {
-  if (field === 'purchase_date') {
-    asset.purchase_date = ''
+const clearDate = (field: 'purchaseDate' | 'warrantyExpiry') => {
+  if (field === 'purchaseDate') {
+    asset.purchaseDate = ''
     if (purchaseDateInput.value) {
       purchaseDateInput.value.value = ''
       purchaseDatePicker.clear()
       purchaseDatePicker.updateValue('')
     }
-  } else if (field === 'warranty_expiry') {
-    asset.warranty_expiry = ''
+  } else if (field === 'warrantyExpiry') {
+    asset.warrantyExpiry = ''
     if (warrantyInput.value) {
       warrantyInput.value.value = ''
       warrantyDatePicker.clear()
@@ -412,9 +369,8 @@ const clearDate = (field: 'purchase_date' | 'warranty_expiry') => {
 }
 
 // Initialize date pickers and event listeners
-onMounted(async () => {
-  await fetchMetadata()
-  await loadAssetData()
+onMounted(() => {
+  loadAssetData()
 
   // Initialize Flatpickr for date inputs
   if (purchaseDateInput.value) {
@@ -422,10 +378,11 @@ onMounted(async () => {
       dateFormat: 'd-m-Y',
       allowInput: false,
       disableMobile: true,
-      // onChange: function(selectedDates: Date[], dateStr: string) {
-      //   asset.purchase_date = dateStr
-      //   updateFieldClasses()
-      // }
+      onChange: function(selectedDates: Date[], dateStr: string) {
+        console.log(selectedDates)
+        asset.purchaseDate = dateStr
+        updateFieldClasses()
+      }
     })
   }
 
@@ -434,10 +391,11 @@ onMounted(async () => {
       dateFormat: 'd-m-Y',
       allowInput: false,
       disableMobile: true,
-      // onChange: function(selectedDates: Date[], dateStr: string) {
-      //   asset.warranty_expiry = dateStr
-      //   updateFieldClasses()
-      // }
+      onChange: function(selectedDates: Date[], dateStr: string) {
+        console.log(selectedDates)
+        asset.warrantyExpiry = dateStr
+        updateFieldClasses()
+      }
     })
   }
   
@@ -464,6 +422,7 @@ onUnmounted(() => {
     warrantyDatePicker.destroy()
   }
   
+  // Remove input event listeners
   const textInputs = [
     assetTagInput.value,
     serialInput.value,
@@ -477,7 +436,6 @@ onUnmounted(() => {
   })
 })
 </script>
-
 <style scoped lang="scss">
   @use "/src/assets/styles/components/forms.scss";
   @use "/src/assets/styles/items.scss";

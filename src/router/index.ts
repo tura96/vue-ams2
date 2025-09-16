@@ -1,11 +1,15 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import AssetsView from '@/views/AssetsView.vue'
 import AssetsForm from '@/views/AssetsForm.vue'
+import LoginForm from '@/components/ui/LoginForm.vue'
+import Dashboard from '@/components/ui/Dashboard.vue'
+import AuthTest from '@/components/ui/AuthTest.vue'
+
 
 const routes = [
   {
     path: '/',
-    name: 'Dashboard',
+    name: 'Asset Items',
     component: AssetsView,
     meta: { title: 'Asset Items' }
   },
@@ -15,12 +19,31 @@ const routes = [
     component: AssetsForm,
     meta: { title: 'Add asset Item' }
   },
-  // {
-  //   path: '/tickets',
-  //   name: 'Tickets',
-  //   component: ServiceTicketsView,
-  //   meta: { title: 'Service Tickets' }
-  // }
+   {
+    path: '/assets/:id',
+    name: 'EditAsset',
+    component: AssetsForm,
+    meta: { title: 'Edit Asset' },
+    props: true // Pass route params as props to the component
+  },
+  {
+    path: '/login',
+    name: 'Login ',
+    component: LoginForm,
+    meta: { title: 'Login Form' }
+  },
+  {
+    path: '/dashboard',
+    name: 'Dashboard',
+    component: Dashboard,
+    meta: { title: 'Dashboard' }
+  },
+  {
+    path: '/authtest',
+    name: 'AuthTest',
+    component: AuthTest,
+    meta: { title: 'AuthTest' }
+  }
 ]
 
 // const router = createRouter({

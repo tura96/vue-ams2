@@ -63,22 +63,22 @@
             {{ asset.id }}
           </td>
           <td class="table__cell">
-            <span class="asset-tag">{{ asset.tag }}</span>
+            <span class="asset-tag">{{ asset.asset_tag }}</span>
             <img
               src="/assets/images/icons/mdi_content-copy.svg"
               alt="Copy"
               class="asset-tag__copy"
-              @click="copyToClipboard(asset.tag)"
+              @click="copyToClipboard(asset.asset_tag)"
             />
           </td>
           <td class="table__cell">{{ asset.model }}</td>
-          <td class="table__cell">{{ asset.serial }}</td>
+          <td class="table__cell">{{ asset.serial_number }}</td>
           <td class="table__cell">
             <AssetStatus :status="asset.status" />
           </td>
-          <td class="table__cell">{{ asset.assignedTo || '-' }}</td>
+          <td class="table__cell">{{ asset.assigned_to || '-' }}</td>
           <td class="table__cell">{{ asset.location || '-' }}</td>
-          <td class="table__cell">{{ formatDate(asset.warrantyExpiry) }}</td>
+          <td class="table__cell">{{ formatDate(asset.warranty_expiry) }}</td>
           <td class="table__cell">{{ asset.notes }}</td>
           <td class="table__cell table__cell--actions">
             <AssetActions
@@ -144,7 +144,8 @@ function sortBy(column: string) {
 }
 
 function copyToClipboard(text: string) {
-  navigator.clipboard.writeText(text)
+  // navigator.clipboard.writeText(text)
+  console.log(`Copied to clipboard: ${text}`)
 }
 
 function formatDate(date: string | Date) {

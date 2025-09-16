@@ -1,5 +1,5 @@
 <template>
-  <aside class="sidebar" :class="{ 'open': !isCollapsed, 'close': isCollapsed }">
+  <aside class="sidebar" :class="{ 'open': !isSidebarCollapsed, 'close': isSidebarCollapsed }">
     <nav class="sidebar__nav">
       <div class="sidebar__header">
         <div class="sidebar__logo">
@@ -33,9 +33,9 @@
     <div class="sidebar__collapse">
       <button class="sidebar__collapse-btn" @click="toggleSidebar">
         <img src="@/assets/images/icons/mdi_arrow-left-drop-circle-outline.svg" 
-             alt="Collapse Menu" class="sidebar__collapse-icon" :class="{ 'close' : isCollapsed }">
+             alt="Collapse Menu" class="sidebar__collapse-icon" :class="{ 'close' : isSidebarCollapsed  }">
              <div class="nav-name">
-               {{ isCollapsed ? 'Expand' : 'Collapse' }} Menu
+               {{ isSidebarCollapsed ? 'Expand' : 'Collapse' }} Menu
              </div>
       </button>
     </div>
@@ -44,6 +44,8 @@
 
 <script lang="ts" setup>
 import { ref } from 'vue';
+import { storeToRefs } from 'pinia'
+import { useUIStore } from '../../stores/ui'
 import NavItem from '@/components/navigation/NavItem.vue';
 import NavSubmenu from '@/components/navigation/NavSubmenu.vue';
 
@@ -67,19 +69,27 @@ import manufacturerIcon from '@/assets/images/icons/material-symbols_precision-m
 const userName = ref('Neo');
 const userRole = ref('Requester');
 
-// Define props
-const props = defineProps<{
-  isCollapsed: boolean;
-}>();
-console.log('Header prop: ', props)
+// // Define props
+// const props = defineProps<{
+//   isCollapsed: boolean;
+// }>();
+// console.log('Header prop: ', props)
 
-// Define emits
-const emit = defineEmits<{
-  (e: 'toggle'): void;
-}>();
+// // Define emits
+// const emit = defineEmits<{
+//   (e: 'toggle'): void;
+// }>();
+
+// use the UI store
+const uiStore = useUIStore()
+const { isSidebarCollapsed } = storeToRefs(uiStore)
+
+function toggleSidebar() {
+  uiStore.toggleSidebar()
+}
 
 const navItems = [
-  { href: '#', icon: dashboardIcon, label: 'Dashboard' },
+  { href: '/dashboard', icon: dashboardIcon, label: 'Dashboard' },
   { href: '#', icon: ticketIcon, label: 'Service Tickets' },
   { href: '#', icon: calendarIcon, label: "Engineer's Daily Schedule" },
   { href: '#', icon: reportIcon, label: 'Statistical Report', expandable: true },
@@ -92,7 +102,7 @@ const navItems = [
 const assetSubItems = [
   { href: '#', icon: dashboardIcon, name: 'Dashboard' },
   { href: '#', icon: assetModelIcon, name: 'Asset Model' },
-  { href: '/items', icon: assetItemIcon, name: 'Asset Items', active: true },
+  { href: '/', icon: assetItemIcon, name: 'Asset Items', active: true },
   { href: '#', icon: storeIcon, name: 'Store And Location' },
   { href: '#', icon: categoryIcon, name: 'Category' },
   { href: '#', icon: manufacturerIcon, name: 'Manufacturer' },
@@ -102,9 +112,9 @@ const assetSubItems = [
 //   isCollapsed.value = !isCollapsed.value;
 // }
 
-function toggleSidebar() {
-  emit('toggle');
-}
+// function toggleSidebar() {
+//   emit('toggle');
+// }
 </script>
 
 <style scoped lang="scss">
