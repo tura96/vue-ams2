@@ -120,6 +120,34 @@ export const useAssetStore = defineStore('assets', () => {
       setLoading(false)
     }
   }
+  // Fetch only asset title (lightweight method for router)
+  const fetchAssetTitle = async (id: number): Promise<string | null> => {
+    try {
+      // First check if asset is already in store
+      const existingAsset = assets.value.find(asset => asset.id === id)
+      if (existingAsset) {
+        return existingAsset.title
+      }
+
+      // If not in store, check currentAsset
+      if (currentAsset.value?.id === id) {
+        return currentAsset.value.title
+      }
+
+      // If not found locally, make API call
+      const response = await amsApi.getAsset(id)
+
+      if (response.success && response.data) {
+        return response.data.title
+      } else {
+        console.warn(`Asset with ID ${id} not found`)
+        return null
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch asset title:', err)
+      return null
+    }
+  }
 
   // Create new asset
   const createAsset = async (assetData: AssetCreateData): Promise<Asset | null> => {
@@ -385,6 +413,7 @@ export const useAssetStore = defineStore('assets', () => {
     // Actions
     fetchAssets,
     fetchAsset,
+    fetchAssetTitle,
     createAsset,
     updateAsset,
     deleteAsset,

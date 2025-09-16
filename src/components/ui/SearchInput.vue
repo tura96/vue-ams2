@@ -12,7 +12,10 @@
       :placeholder="computedPlaceholder" 
       :value="modelValue" 
       class="search__input input-floating__field"
+      :class="{ active: isActive }"
       id="search"
+      ref="inputRef"
+
     />
 
     <label for="search" class="input-floating__label">{{ computedLabel }}</label>
@@ -20,32 +23,41 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref } from 'vue'
 
 // Props
 const props = defineProps<{
-  modelValue: string;
-  placeholder?: string;
-  label?: string;
-}>();
+  modelValue: string
+  placeholder?: string
+  label?: string
+}>()
 
 // Emits
 const emit = defineEmits<{
-  (e: 'update:modelValue', value: string): void;
-}>();
+  (e: 'update:modelValue', value: string): void
+}>()
+// Track active state (input has value or is focused)
+const isActive = ref(!!props.modelValue)
 
 // Local input ref
-const inputRef = ref<HTMLInputElement | null>(null);
+const inputRef = ref<HTMLInputElement | null>(null)
 
 // Computed values
-const computedLabel = computed(() => props.label || 'Search');
-const computedPlaceholder = computed(() => props.placeholder || 'Search...');
+const computedLabel = computed(() => props.label || 'Search')
+const computedPlaceholder = computed(() => props.placeholder || 'Search...')
+
+// Input event handler for real-time updates
+function onInput(event: Event) {
+  const input = event.target as HTMLInputElement
+  emit('update:modelValue', input.value)
+}
 
 // Icon click handler
 function onSearchClick() {
   if (inputRef.value) {
-    emit('update:modelValue', inputRef.value.value);
-    console.log('Search icon clicked, input value emitted:', inputRef.value.value);
+    emit('update:modelValue', inputRef.value.value)
+    // Optional: Focus the input for better UX
+    inputRef.value.focus()
   }
 }
 </script>

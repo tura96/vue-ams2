@@ -1,22 +1,25 @@
 <template>
   <div class="content__toolbar">
-    <SearchInput v-model="filters.search" :placeholder="Search" />
+    <SearchInput 
+      v-model="localFilters.search" 
+      :placeholder="placeholder || 'Search'" 
+    />
 
     <div class="filters">
       <CustomSelect 
-        v-model="filters.status" 
+        v-model="localFilters.status" 
         label="Status" 
         :options="statusOptions" 
       />
 
       <CustomSelect 
-        v-model="filters.model" 
+        v-model="localFilters.model" 
         label="Model" 
         :options="modelOptions" 
       />
 
       <CustomSelect 
-        v-model="filters.store" 
+        v-model="localFilters.store" 
         label="Store" 
         :options="storeOptions" 
       />
@@ -52,6 +55,7 @@ const props = defineProps<{
   modelOptions: Option[]
   storeOptions: Option[]
   placeholder?: string
+  activeFilters: Filters
 }>()
 
 // --- Emits ---
@@ -59,22 +63,38 @@ const emit = defineEmits<{
   (e: 'filter-change', filters: Filters): void
 }>()
 
-// --- State ---
-const filters = ref<Filters>({
-  search: '',
-  status: '',
-  model: '',
-  store: ''
+// Local reactive filters, initialized with activeFilters
+const localFilters = ref<Filters>({
+  search: props.activeFilters.search,
+  status: props.activeFilters.status,
+  model: props.activeFilters.model,
+  store: props.activeFilters.store
 })
 
-// --- Watch ---
-watch(filters, (newFilters) => {
-  emit('filter-change', newFilters)
-}, { deep: true })
+// Sync localFilters with activeFilters when the prop changes
+watch(
+  () => props.activeFilters,
+  (newFilters) => {
+    localFilters.value = { ...newFilters }
+  },
+  { deep: true }
+)
+
+// Emit filter changes when localFilters changes
+watch(
+  localFilters,
+  (newFilters) => {
+    emit('filter-change', { ...newFilters })
+  },
+  { deep: true }
+)
 
 // --- Methods ---
 function applyBulkAction() {
-  console.log('Bulk deploy action triggered', props)
+  // Placeholder for bulk deploy logic
+  console.log('Bulk deploy action triggered with filters:', localFilters.value)
+  // Optionally emit an event if the parent needs to handle this
+  // emit('bulk-deploy', localFilters.value)
 }
 </script>
 

@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAssetStore } from '../stores/assets'
 import AssetsView from '@/views/AssetsView.vue'
 import AssetsForm from '@/views/AssetsForm.vue'
 import LoginForm from '@/components/ui/LoginForm.vue'
@@ -55,10 +56,51 @@ const router = createRouter({
   routes,
 })
 
-// Update page title based on route meta
-router.beforeEach((to) => {
-  document.title = to.meta.title ? `${to.meta.title} - Asset Management` : 'Asset Management'
-  // next()
+router.beforeEach(async (to, from, next) => {
+  const assetStore = useAssetStore()
+  let title = to.meta.title || 'Asset Management'
+
+  if (to.name === 'EditAsset' && to.params.id) {
+    try {
+      const assetId = Number(to.params.id)
+      
+      // Debug logging
+      if (import.meta.env.DEV) {
+        console.log('Fetching asset with ID:', assetId)
+        console.log('Asset store:', assetStore)
+      }
+      
+      const asset = await assetStore.fetchAssetTitle(assetId)
+      
+      if (import.meta.env.DEV) {
+        console.log('Fetched asset result:', asset)
+        console.log('Asset type:', typeof asset)
+      }
+      
+      if (asset) {
+        // Asset not found - redirect to assets list or show error
+        console.warn(`Asset with ID ${assetId} not found`)
+        title = `${asset}`
+        // Optionally redirect: next({ name: 'Asset Items' }); return;
+      } else {
+        title = (asset as any)?.title || `Edit Asset #${assetId}`
+      }
+      
+    } catch (err) {
+      console.error('Failed to fetch asset:', err)
+      title = 'Edit Asset'
+    }
+  }
+
+  document.title = `${title} - Asset Management`
+  to.meta.dynamicTitle = title
+  next()
 })
+
+// Update page title based on route meta
+// router.beforeEach((to) => {
+//   document.title = to.meta.title ? `${to.meta.title} - Asset Management` : 'Asset Management'
+//   // next()
+// })
 
 export default router

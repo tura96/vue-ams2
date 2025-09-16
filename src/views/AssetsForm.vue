@@ -1,5 +1,5 @@
 <template>
-  <div class="item-detail">
+  <div class="item-detail" v-if="!loading && !error">
     <!-- Form Content -->
     <form class="item-detail__content" autocomplete="off" @submit.prevent>
       <!-- Basic Information Section -->
@@ -12,6 +12,7 @@
               type="text" 
               id="assetTag" 
               class="input-floating__field" 
+              :class="{ 'input-floating__field--has-value': asset.asset_tag }"
               placeholder="Asset Tag"
               v-model="asset.asset_tag"
               ref="assetTagInput"
@@ -31,6 +32,7 @@
               type="text" 
               id="serialNumber" 
               class="input-floating__field" 
+              :class="{ 'input-floating__field--has-value': asset.serial_number }"
               placeholder="Serial Number"
               v-model="asset.serial_number"
               ref="serialInput"
@@ -58,6 +60,7 @@
               type="text" 
               id="purchaseDate" 
               class="input-floating__field inputdate" 
+              :class="{ 'input-floating__field--has-value': asset.purchase_date }"
               placeholder="Purchase Date"
               v-model="asset.purchase_date"
               ref="purchaseDateInput"
@@ -73,6 +76,7 @@
               type="number" 
               id="cost" 
               class="input-floating__field" 
+              :class="{ 'input-floating__field--has-value': asset.purchase_cost }"
               placeholder="Cost"
               v-model="asset.purchase_cost"
               ref="costInput"
@@ -86,6 +90,7 @@
               type="text" 
               id="warrantyExpiry" 
               class="input-floating__field inputdate" 
+              :class="{ 'input-floating__field--has-value': asset.warranty_expiry }"
               placeholder="Warranty Expiry"
               v-model="asset.warranty_expiry"
               ref="warrantyInput"
@@ -101,6 +106,7 @@
               type="text" 
               id="rfidTag" 
               class="input-floating__field" 
+              :class="{ 'input-floating__field--has-value': asset.rfid_tag }"
               placeholder="RFID Tag ID"
               v-model="asset.rfid_tag"
               ref="rfidInput"
@@ -134,6 +140,7 @@
               <textarea 
                 id="notes" 
                 class="multiselect-floating__field" 
+                :class="{ 'multiselect-floating__field--has-value': asset.notes }"
                 rows="4" 
                 placeholder=" "
                 v-model="asset.notes"
@@ -156,16 +163,18 @@
       </div>
     </form>
   </div>
+  <div v-else-if="loading" class="loading">Loading asset data...</div>
+  <div v-else-if="error" class="error">{{ error }}</div>
 </template>
 
 <script lang="ts" setup>
-import { ref, reactive, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { ref, reactive, onMounted, onUnmounted , nextTick , watch } from 'vue'
 import { useRouter } from 'vue-router'
 import flatpickr from 'flatpickr'
 import 'flatpickr/dist/flatpickr.css'
 import '@/assets/styles/items.scss'
 import CustomSelect from '@/components/ui/CustomSelect.vue'
-import { amsApi, type Asset, type AssetCreateData} from '../services/amsApi'
+import { amsApi, type Asset, type AssetCreateData } from '../services/amsApi'
 
 interface SelectOption {
   value: string
@@ -190,6 +199,9 @@ const statusSelect = ref<InstanceType<typeof CustomSelect> | null>(null)
 const storeSelect = ref<InstanceType<typeof CustomSelect> | null>(null)
 const locationSelect = ref<InstanceType<typeof CustomSelect> | null>(null)
 
+const loading = ref(true)
+const error = ref<string | null>(null)
+
 let purchaseDatePicker: any = null
 let warrantyDatePicker: any = null
 
@@ -207,7 +219,7 @@ const asset = reactive<Asset>({
   warranty_expiry: '',
   notes: '',
   purchase_date: '',
-  purchase_cost: 0,
+  purchase_cost: '',
   date_created: '',
   date_modified: '',
   rfid_tag: ''
@@ -218,59 +230,16 @@ const statusOptions = ref<SelectOption[]>([])
 const storeOptions = ref<SelectOption[]>([])
 const locationOptions = ref<SelectOption[]>([])
 
-// Update field classes based on value
-const updateFieldClasses = () => {
-  const textInputs = [
-    { element: assetTagInput.value, value: asset.asset_tag, className: 'input-floating__field--has-value' },
-    { element: serialInput.value, value: asset.serial_number, className: 'input-floating__field--has-value' },
-    { element: costInput.value, value: asset.purchase_cost, className: 'input-floating__field--has-value' },
-    { element: rfidInput.value, value: asset.rfid_tag, className: 'input-floating__field--has-value' },
-    { element: purchaseDateInput.value, value: asset.purchase_date, className: 'input-floating__field--has-value' },
-    { element: warrantyInput.value, value: asset.warranty_expiry, className: 'input-floating__field--has-value' },
-    { element: notesInput.value, value: asset.notes, className: 'multiselect-floating__field--has-value' }
-  ]
-  
-  textInputs.forEach(({ element, value, className }) => {
-    if (element) {
-      if (value) {
-        element.classList.add(className)
-      } else {
-        element.classList.remove(className)
-      }
-    }
-  })
-  
-  const selectInputs = [
-    { element: modelSelect.value, value: asset.model },
-    { element: statusSelect.value, value: asset.status },
-    { element: storeSelect.value, value: asset.store },
-    { element: locationSelect.value, value: asset.location }
-  ]
-  
-  selectInputs.forEach(({ element, value }) => {
-    if (element) {
-      const selectElement = element.$el?.querySelector('.select-floating__field')
-      if (selectElement) {
-        if (value) {
-          selectElement.classList.add('select-floating__field--has-value')
-        } else {
-          selectElement.classList.remove('select-floating__field--has-value')
-        }
-      }
-    }
-  })
-}
-
-// Watch for changes in asset properties
-watch(() => asset, () => {
-  updateFieldClasses()
-}, { deep: true })
-
 // Fetch metadata for dropdowns
-const fetchMetadata = async () => {
+async function fetchMetadata() {
   try {
-    // Fetch models
-    const modelsResponse = await amsApi.getModels()
+    const [modelsResponse, statusesResponse, locationsResponse, assignedResponse] = await Promise.all([
+      amsApi.getModels(),
+      amsApi.getStatuses(),
+      amsApi.getLocations(),
+      amsApi.getAssigned()
+    ])
+
     if (modelsResponse.success && modelsResponse.data) {
       modelOptions.value = modelsResponse.data.map(model => ({
         value: model,
@@ -278,8 +247,6 @@ const fetchMetadata = async () => {
       }))
     }
 
-    // Fetch statuses
-    const statusesResponse = await amsApi.getStatuses()
     if (statusesResponse.success && statusesResponse.data) {
       statusOptions.value = Object.entries(statusesResponse.data).map(([value, label]) => ({
         value,
@@ -287,56 +254,49 @@ const fetchMetadata = async () => {
       }))
     }
 
-    // Fetch locations (assuming stores are fetched from locations endpoint)
-    const locationsResponse = await amsApi.getLocations()
     if (locationsResponse.success && locationsResponse.data) {
       locationOptions.value = locationsResponse.data.map(location => ({
         value: location,
         label: location
       }))
-
     }
-    // Fetch locations (assuming stores are fetched from locations endpoint)
-    const assignedResponse = await amsApi.getAssigned()
+
     if (assignedResponse.success && assignedResponse.data) {
       storeOptions.value = assignedResponse.data.map(assigned_to => ({
         value: assigned_to,
         label: assigned_to
       }))
     }
-
-  } catch (error) {
-    console.error('Error fetching metadata:', error)
-    alert('Failed to load dropdown options')
+  } catch (err) {
+    console.error('Error fetching metadata:', err)
+    throw new Error('Failed to load dropdown options')
   }
 }
 
 // Load asset data if editing
-const loadAssetData = async () => {
-  if (props.id) {
-    try {
-      const response = await amsApi.getAsset(Number(props.id))
-      if (response.success && response.data) {
-        Object.assign(asset, response.data)
-        // Ensure optional fields are set to empty string if undefined
-        asset.description = asset.description || ''
-        asset.assigned_to = asset.assigned_to || ''
-        asset.location = asset.location || ''
-        asset.store = asset.store || ''
-        asset.warranty_expiry = asset.warranty_expiry || ''
-        asset.notes = asset.notes || ''
-        asset.purchase_date = asset.purchase_date || ''
-        asset.purchase_cost = asset.purchase_cost || 0
-        asset.rfid_tag = asset.rfid_tag || ''
-        // Update classes after data is loaded
-        nextTick(() => {
-          updateFieldClasses()
-        })
-      }
-    } catch (error) {
-      console.error('Error fetching asset:', error)
-      alert('Failed to load asset data')
+async function loadAssetData() {
+  if (!props.id) return
+  try {
+    const response = await amsApi.getAsset(Number(props.id))
+    if (response.success && response.data) {
+      Object.assign(asset, {
+        ...response.data,
+        description: response.data.description || '',
+        assigned_to: response.data.assigned_to || '',
+        location: response.data.location || '',
+        store: response.data.store || '',
+        warranty_expiry: response.data.warranty_expiry || '',
+        notes: response.data.notes || '',
+        purchase_date: response.data.purchase_date || '',
+        purchase_cost: response.data.purchase_cost || 0,
+        rfid_tag: response.data.rfid_tag || ''
+      })
+    } else {
+      throw new Error('No asset data returned')
     }
+  } catch (err) {
+    console.error('Error fetching asset:', err)
+    throw err
   }
 }
 
@@ -345,13 +305,11 @@ const goBack = () => {
 }
 
 const saveAsset = async () => {
-  // Validate required fields
   if (!asset.asset_tag || !asset.model || !asset.serial_number) {
     alert('Please fill in all required fields (Asset Tag, Model, Serial Number)')
     return
   }
 
-  // Prepare data for saving
   const assetData: AssetCreateData = {
     title: asset.title || `Asset ${asset.asset_tag}`,
     description: asset.description,
@@ -371,14 +329,12 @@ const saveAsset = async () => {
 
   try {
     if (props.id) {
-      // Update existing asset
       const response = await amsApi.updateAsset(Number(props.id), assetData)
       if (response.success) {
         alert('Asset updated successfully!')
         router.push('/')
       }
     } else {
-      // Create new asset
       const response = await amsApi.createAsset(assetData)
       if (response.success) {
         alert('Asset created successfully!')
@@ -387,7 +343,7 @@ const saveAsset = async () => {
     }
   } catch (error) {
     console.error('Error saving asset:', error)
-    // alert(`Failed to save asset: ${error.message}`)
+    alert('Failed to save asset')
   }
 }
 
@@ -395,90 +351,122 @@ const saveAsset = async () => {
 const clearDate = (field: 'purchase_date' | 'warranty_expiry') => {
   if (field === 'purchase_date') {
     asset.purchase_date = ''
-    if (purchaseDateInput.value) {
-      purchaseDateInput.value.value = ''
+    if (purchaseDatePicker) {
       purchaseDatePicker.clear()
-      purchaseDatePicker.updateValue('')
     }
   } else if (field === 'warranty_expiry') {
     asset.warranty_expiry = ''
-    if (warrantyInput.value) {
-      warrantyInput.value.value = ''
+    if (warrantyDatePicker) {
       warrantyDatePicker.clear()
-      warrantyDatePicker.updateValue('')
     }
   }
-  updateFieldClasses()
 }
 
-// Initialize date pickers and event listeners
-onMounted(async () => {
-  await fetchMetadata()
-  await loadAssetData()
-
-  // Initialize Flatpickr for date inputs
+// Initialize flatpickr date pickers
+async function initializeFlatpickr() {
+  await nextTick() // Ensure DOM is updated
+  
   if (purchaseDateInput.value) {
-    purchaseDatePicker = flatpickr(purchaseDateInput.value, {
-      dateFormat: 'd-m-Y',
-      allowInput: false,
-      disableMobile: true,
-      // onChange: function(selectedDates: Date[], dateStr: string) {
-      //   asset.purchase_date = dateStr
-      //   updateFieldClasses()
-      // }
-    })
+    try {
+      purchaseDatePicker = flatpickr(purchaseDateInput.value, {
+        dateFormat: 'd-m-Y',
+        allowInput: false,
+        disableMobile: true,
+        onChange: (selectedDates: Date[], dateStr: string) => {
+          asset.purchase_date = dateStr
+          // if (import.meta.env.DEV) console.log('purchase_date updated:', dateStr)
+        }
+      })
+      if (asset.purchase_date) {
+        purchaseDatePicker.setDate(asset.purchase_date, true, 'd-m-Y')
+        // if (import.meta.env.DEV) console.log('Set purchase_date:', asset.purchase_date)
+      }
+    } catch (err) {
+      // console.error('Failed to initialize purchase_date flatpickr:', err)
+      error.value = 'Failed to initialize date picker'
+    }
+  } else {
+    if (import.meta.env.DEV) console.warn('purchaseDateInput ref is null')
   }
 
   if (warrantyInput.value) {
-    warrantyDatePicker = flatpickr(warrantyInput.value, {
-      dateFormat: 'd-m-Y',
-      allowInput: false,
-      disableMobile: true,
-      // onChange: function(selectedDates: Date[], dateStr: string) {
-      //   asset.warranty_expiry = dateStr
-      //   updateFieldClasses()
-      // }
-    })
+    try {
+      warrantyDatePicker = flatpickr(warrantyInput.value, {
+        dateFormat: 'd-m-Y',
+        allowInput: false,
+        disableMobile: true,
+        onChange: (selectedDates: Date[], dateStr: string) => {
+          asset.warranty_expiry = dateStr
+          // if (import.meta.env.DEV) console.log('warranty_expiry updated:', dateStr)
+        }
+      })
+      if (asset.warranty_expiry) {
+        warrantyDatePicker.setDate(asset.warranty_expiry, true, 'd-m-Y')
+        // if (import.meta.env.DEV) console.log('Set warranty_expiry:', asset.warranty_expiry)
+      }
+    } catch (err) {
+      // console.error('Failed to initialize warranty_expiry flatpickr:', err)
+      error.value = 'Failed to initialize date picker'
+    }
+  } else {
+    if (import.meta.env.DEV) console.warn('warrantyInput ref is null')
   }
-  
-  // Add input event listeners to text fields
-  const textInputs = [
-    assetTagInput.value,
-    serialInput.value,
-    costInput.value,
-    rfidInput.value,
-    notesInput.value
-  ].filter(Boolean) as HTMLInputElement[]
-  
-  textInputs.forEach(input => {
-    input.addEventListener('input', updateFieldClasses)
-  })
+}
+
+// Initialize component
+onMounted(async () => {
+  loading.value = true
+  error.value = null
+  try {
+    await fetchMetadata()
+    await loadAssetData()
+  } catch (err: any) {
+    error.value = `Failed to load data: ${err.message}`
+    router.push('/') // Redirect on error
+  } finally {
+    loading.value = false
+  }
 })
 
-// Clean up date pickers and event listeners
+// Watch for loading state to initialize flatpickr
+watch(loading, async (newValue) => {
+  if (!newValue && !error.value) {
+    await initializeFlatpickr()
+  }
+})
+
+// Clean up date pickers
 onUnmounted(() => {
   if (purchaseDatePicker) {
     purchaseDatePicker.destroy()
+    purchaseDatePicker = null
+    if (import.meta.env.DEV) console.log('Destroyed purchase_date picker')
   }
   if (warrantyDatePicker) {
     warrantyDatePicker.destroy()
+    warrantyDatePicker = null
+    if (import.meta.env.DEV) console.log('Destroyed warranty_expiry picker')
   }
-  
-  const textInputs = [
-    assetTagInput.value,
-    serialInput.value,
-    costInput.value,
-    rfidInput.value,
-    notesInput.value
-  ].filter(Boolean) as HTMLInputElement[]
-  
-  textInputs.forEach(input => {
-    input.removeEventListener('input', updateFieldClasses)
-  })
 })
+
 </script>
 
 <style scoped lang="scss">
-  @use "/src/assets/styles/components/forms.scss";
-  @use "/src/assets/styles/items.scss";
+@use "/src/assets/styles/components/forms.scss";
+@use "/src/assets/styles/items.scss";
+
+.loading {
+  text-align: center;
+  padding: 2rem;
+  color: #4a5568;
+}
+
+.error {
+  text-align: center;
+  padding: 2rem;
+  color: #c53030;
+  background: #fff5f5;
+  border: 1px solid #feb2b2;
+  border-radius: 8px;
+}
 </style>

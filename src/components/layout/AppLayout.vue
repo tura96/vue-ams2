@@ -30,7 +30,8 @@ const isSidebarCollapsed = ref(true)
 const route = useRoute();
 
 // Compute the current route's title from meta data, fallback to 'Asset Management'
-const currentRouteTitle = computed(() => route.meta.title || 'Asset Management');
+// const currentRouteTitle = computed(() => route.meta.title || 'Asset Management');
+const currentRouteTitle = computed(() => route.meta.dynamicTitle || route.meta.title || 'Asset Management')
 
 function toggleSidebar() {
   console.log('toggleSidebar called, current isSidebarCollapsed:', isSidebarCollapsed.value);

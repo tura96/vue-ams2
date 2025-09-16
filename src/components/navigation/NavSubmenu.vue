@@ -8,7 +8,7 @@
       :expanded="isExpanded"
       @click="toggle"
     />
-    
+    <transition name="slide-down">
     <div class="nav__sublist" v-if="isExpanded">
       <a v-for="item in items" :key="item.name" 
          :href="item.href" class="nav__subitem"
@@ -18,6 +18,7 @@
         <div class="nav-name">{{ item.name }}</div>
       </a>
     </div>
+    </transition>
   </div>
 </template>
 
@@ -53,4 +54,24 @@ function navigateTo(path: string) {
 </script>
 <style scoped lang="scss">
   @use "/src/assets/styles/components/sidebar.scss";
+  // Slide-down animation
+.slide-down-enter-active,
+.slide-down-leave-active {
+  transition: all 0.3s ease;
+}
+
+.slide-down-enter-from,
+.slide-down-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+  height: 0;
+  overflow: hidden;
+}
+
+.slide-down-enter-to,
+.slide-down-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+  height: auto;
+}
 </style>

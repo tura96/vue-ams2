@@ -18,7 +18,7 @@ export interface Asset {
   warranty_expiry?: string
   notes?: string
   purchase_date?: string
-  purchase_cost?: number
+  purchase_cost?: string | number | undefined
   date_created: string
   date_modified: string
   rfid_tag:string
@@ -48,7 +48,7 @@ export interface AssetCreateData {
   warranty_expiry?: string
   notes?: string
   purchase_date?: string
-  purchase_cost?: number
+  purchase_cost?: any
   rfid_tag?:string
 }
 
@@ -120,7 +120,18 @@ class AMSApiService {
 
   private getAuthHeaders() {
     const token = Cookies.get('ams_token')
-    return token ? { Authorization: `Bearer ${token}` } : {}
+    // console.log('Token from cookie:', token ? 'Present' : 'Missing') // Debug log
+    
+    if (!token) {
+      console.warn('No ams_token cookie found')
+      return {}
+    }
+    
+    const headers = { 
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+    return headers
   }
 
   // Asset Listing with Search, Sort, Filter, and Pagination
@@ -159,7 +170,7 @@ class AMSApiService {
   async getAsset(id: number): Promise<AssetResponse> {
     try {
       const response: AxiosResponse<AssetResponse> = await axios.get(
-        `${this.baseURL}/assets/${id}`,
+        `${this.baseURL}/asset/${id}`,
         { headers: this.getAuthHeaders() }
       )
 

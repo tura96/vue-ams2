@@ -9,18 +9,27 @@
     
     <div class="content__box">
       <div v-if="loading" class="loading">Loading assets...</div>
-      <!-- <div v-else-if="error" class="error">{{ error }}</div> -->
+      <div v-else-if="error" class="error">{{ error }}</div>
       <div v-else>
         <AssetFilters 
-        :status-options="statusOptions"
-        :model-options="modelOptions"
-        :store-options="storeOptions"
-        @filter-change="handleFilterChange" 
+          :status-options="statusOptions"
+          :model-options="modelOptions"
+          :store-options="storeOptions"
+          :active-filters="filters"
+          @filter-change="handleFilterChange" 
         />
         <AssetTable 
           :assets="filteredAssets" 
           @edit="editAsset" 
-          @delete="deleteAsset" 
+          @delete="deleteAsset"
+          :current-page="currentPage"
+          :items-per-page="itemsPerPage"
+          :selected-assets="selectedAssets"
+          :current-sort-by="sortBy"
+          :current-sort-order="sortOrder"
+          @select-all="handleSelectAll"
+          @select="handleSelect"
+          @sort="handleSort" 
         />
       </div>
     </div>
@@ -38,27 +47,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useAuthStore } from '../stores/auth' // Import auth store from AuthTest.vue
-import axios from 'axios'
+import { useAuthStore } from '../stores/auth'
 import AssetFilters from '@/components/assets/AssetFilters.vue'
 import AssetTable from '@/components/assets/AssetTable.vue'
 import Pagination from '@/components/ui/Pagination.vue'
-import { amsApi } from '../services/amsApi'
-
+import { amsApi, type Asset, type AssetListParams } from '../services/amsApi'
 
 // --- Types ---
-interface Asset {
-  id: number
-  tag: string
-  model: string
-  serial: string
-  status: string
-  assignedTo: string | null
-  location: string | null
-  warrantyExpiry: string
-  notes: string
-}
-
 interface Filters {
   search: string
   status: string
@@ -71,43 +66,52 @@ interface Option {
   label: string
 }
 
-// --- Reactive state for options ---
+// --- Reactive state ---
 const statusOptions = ref<Option[]>([])
 const modelOptions = ref<Option[]>([])
 const storeOptions = ref<Option[]>([])
 
-// --- State ---
+// --- Asset state ---
 const assets = ref<Asset[]>([])
+const selectedAssets = ref<number[]>([])
+
+// --- Filter state ---
 const filters = ref<Filters>({
   search: '',
   status: '',
   model: '',
   store: ''
 })
-const loading = ref(false)
-const error = ref<string | null>(null)
+
+// --- Pagination & Sorting state ---
 const currentPage = ref(1)
 const itemsPerPage = ref(10)
 const totalItems = ref(0)
+const totalPages = ref(0)
+const sortBy = ref<string>('date')
+const sortOrder = ref<'ASC' | 'DESC'>('DESC')
+
+// --- Loading & Error state ---
+const loading = ref(false)
+const error = ref<string | null>(null)
 
 const router = useRouter()
 const route = useRoute()
-const authStore = useAuthStore() // Initialize auth store
+const authStore = useAuthStore()
 
 // --- Computed ---
-const apiUrl = computed(() => import.meta.env.VITE_API_URL) // Base URL from AuthTest.vue
-
 const filteredAssets = computed(() => {
-  // Client-side filtering (optional, depending on API capabilities)
+  // Client-side filtering for search (can be used as additional filtering on top of server results)
   if (!filters.value.search) return assets.value
 
   const searchTerm = filters.value.search.toLowerCase()
   return assets.value.filter(asset =>
-    asset.tag.toLowerCase().includes(searchTerm) ||
-    asset.model.toLowerCase().includes(searchTerm) ||
-    asset.serial.toLowerCase().includes(searchTerm) ||
-    (asset.assignedTo && asset.assignedTo.toLowerCase().includes(searchTerm)) ||
-    (asset.location && asset.location.toLowerCase().includes(searchTerm))
+    asset.asset_tag?.toLowerCase().includes(searchTerm) ||
+    asset.model?.toLowerCase().includes(searchTerm) ||
+    asset.serial_number?.toLowerCase().includes(searchTerm) ||
+    (asset.assigned_to && asset.assigned_to.toLowerCase().includes(searchTerm)) ||
+    (asset.location && asset.location.toLowerCase().includes(searchTerm)) ||
+    (asset.title && asset.title.toLowerCase().includes(searchTerm))
   )
 })
 
@@ -121,14 +125,27 @@ function editAsset(asset: Asset) {
 }
 
 async function deleteAsset(asset: Asset) {
-  if (confirm(`Are you sure you want to delete asset ${asset.tag}?`)) {
+  if (confirm(`Are you sure you want to delete asset ${asset.asset_tag}?`)) {
     try {
       loading.value = true
       error.value = null
-      const headers = authStore.token ? { Authorization: `Bearer ${authStore.token}` } : {}
-      await axios.delete(`${apiUrl.value}/ams/v1/assets/${asset.id}`, { headers })
-      assets.value = assets.value.filter(a => a.id !== asset.id)
-      totalItems.value = assets.value.length
+      
+      const response = await amsApi.deleteAsset(asset.id)
+      
+      if (response.success) {
+        // Remove from local array
+        assets.value = assets.value.filter(a => a.id !== asset.id)
+        totalItems.value = Math.max(0, totalItems.value - 1)
+        
+        // Remove from selected if it was selected
+        const selectedIndex = selectedAssets.value.indexOf(asset.id)
+        if (selectedIndex > -1) {
+          selectedAssets.value.splice(selectedIndex, 1)
+        }
+        
+        // Reload to get accurate pagination
+        await loadAssets()
+      }
     } catch (err: any) {
       error.value = `Failed to delete asset: ${err.message}`
       console.error('Delete error:', err)
@@ -140,7 +157,7 @@ async function deleteAsset(asset: Asset) {
 
 function handleFilterChange(newFilters: Partial<Filters>) {
   filters.value = { ...filters.value, ...newFilters }
-  currentPage.value = 1
+  currentPage.value = 1 // Reset to first page when filtering
   loadAssets()
 }
 
@@ -151,74 +168,125 @@ function handlePageChange(page: number) {
 
 function handleItemsPerPageChange(count: number) {
   itemsPerPage.value = count
-  currentPage.value = 1
+  currentPage.value = 1 // Reset to first page when changing items per page
   loadAssets()
+}
+
+function handleSort(column: string, order: 'ASC' | 'DESC') {
+  sortBy.value = column
+  sortOrder.value = order
+  currentPage.value = 1 // Reset to first page when sorting
+  loadAssets()
+}
+
+function handleSelectAll(selectAll: boolean) {
+  if (selectAll) {
+    selectedAssets.value = assets.value.map(asset => asset.id)
+  } else {
+    selectedAssets.value = []
+  }
+}
+
+function handleSelect(assetId: number) {
+  const index = selectedAssets.value.indexOf(assetId)
+  if (index > -1) {
+    selectedAssets.value.splice(index, 1)
+  } else {
+    selectedAssets.value.push(assetId)
+  }
 }
 
 async function loadAssets() {
   loading.value = true
   error.value = null
+  
   try {
-    const headers = authStore.token ? { Authorization: `Bearer ${authStore.token}` } : {}
-    const response = await axios.get(`${apiUrl.value}/ams/v1/assets`, {
-      headers,
-      params: {
-        page: currentPage.value,
-        limit: itemsPerPage.value,
-        search: filters.value.search || undefined,
-        status: filters.value.status || undefined,
-        model: filters.value.model || undefined,
-        store: filters.value.store || undefined
-      }
-    })
-    assets.value = response.data.data // Adjust based on API response structure
-    console.log('Fetched assets:', assets)
-    totalItems.value = response.data.total || response.data.length
+    const params: AssetListParams = {
+      page: currentPage.value,
+      per_page: itemsPerPage.value,
+      sort_by: sortBy.value as any,
+      sort_order: sortOrder.value,
+    }
+    
+    // Add filters if they have values
+    if (filters.value.search) params.search = filters.value.search
+    if (filters.value.status) params.status = filters.value.status as any
+    if (filters.value.model) params.model = filters.value.model
+    if (filters.value.store) params.location = filters.value.store // Assuming store maps to location
+    
+    const response = await amsApi.getAssets(params)
+    
+    if (response.success && response.data) {
+      assets.value = response.data
+      totalItems.value = response.pagination?.total_items || 0
+      totalPages.value = response.pagination?.total_pages || 0
+      
+      console.log('Fetched assets:', assets.value)
+      console.log('Pagination:', response.pagination)
+    } else {
+      throw new Error('Failed to fetch assets')
+    }
   } catch (err: any) {
     error.value = `Failed to load assets: ${err.message}`
     console.error('Fetch error:', err)
+    
+    // If authentication error, redirect to login
+    if (err.message.includes('Authentication') || err.message.includes('Invalid token')) {
+      authStore.logout()
+      router.push('/login')
+    }
   } finally {
     loading.value = false
   }
 }
 
-// --- Lifecycle ---
-onMounted(() => {
-  if (!authStore.isAuthenticated) {
-    error.value = 'Please log in to view assets.'
-    router.push('/login') // Redirect to login if not authenticated
-  } else {
-    loadAssets()
-  }
-  console.log('Route data:', route)
-})
-
-onMounted(async () => {
+async function loadFilterOptions() {
   try {
-    // Fetch statuses (API returns { value: label } object)
-    const statusesRes = await amsApi.getStatuses()
+    // Load all filter options in parallel
+    const [statusesRes, modelsRes, locationsRes] = await Promise.all([
+      amsApi.getStatuses(),
+      amsApi.getModels(), 
+      amsApi.getLocations()
+    ])
+
+    // Process statuses (API returns { value: label } object)
     if (statusesRes.success && statusesRes.data) {
       statusOptions.value = Object.entries(statusesRes.data).map(
         ([value, label]) => ({ value, label })
       )
     }
 
-    // Fetch models (API returns string[])
-    const modelsRes = await amsApi.getModels()
+    // Process models (API returns string[])
     if (modelsRes.success && modelsRes.data) {
       modelOptions.value = modelsRes.data.map(m => ({ value: m, label: m }))
     }
 
-    // Fetch locations/stores (API returns string[])
-    const storesRes = await amsApi.getLocations()
-    if (storesRes.success && storesRes.data) {
-      storeOptions.value = storesRes.data.map(s => ({ value: s, label: s }))
+    // Process locations/stores (API returns string[])
+    if (locationsRes.success && locationsRes.data) {
+      storeOptions.value = locationsRes.data.map(s => ({ value: s, label: s }))
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error('Failed to load filter options:', err)
+    error.value = `Failed to load filter options: ${err.message}`
   }
-})
+}
 
+// --- Lifecycle ---
+onMounted(async () => {
+  if (!authStore.isAuthenticated) {
+    error.value = 'Please log in to view assets.'
+    router.push('/login')
+    return
+  }
+
+  // Load filter options and assets in parallel
+  await Promise.all([
+    loadFilterOptions(),
+    loadAssets()
+  ])
+  
+  console.log('Route data:', route)
+})
 </script>
 
 <style scoped lang="scss">
@@ -228,14 +296,5 @@ onMounted(async () => {
   text-align: center;
   padding: 2rem;
   color: #4a5568;
-}
-
-.error {
-  text-align: center;
-  padding: 2rem;
-  color: #c53030;
-  background: #fff5f5;
-  border: 1px solid #feb2b2;
-  border-radius: 8px;
 }
 </style>

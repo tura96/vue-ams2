@@ -84,7 +84,7 @@ export const useAuthStore = defineStore('auth', {
       this.user = null
       this.token = null
       this.isAuthenticated = false
-      // Cookies.remove('ams_token')
+      Cookies.remove('ams_token')
       Cookies.remove('ams_user')
       delete axios.defaults.headers.common['Authorization']
     },
