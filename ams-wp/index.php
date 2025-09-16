@@ -4,7 +4,7 @@
  * 
  * Plugin Name: AMS REST API
  * Description: Custom REST API for Asset Management System with JWT Authentication
- * Version: 1.0.0
+ * Version: 2.0.0
  * Author: Tee
  */
 
@@ -74,12 +74,12 @@ class AMS_REST_API
         register_post_type('asset_item', $args);
 
         // Register taxonomies
-        register_taxonomy('asset_category', 'asset_item', array(
-            'label' => 'Categories',
-            'rewrite' => array('slug' => 'asset-category'),
-            'hierarchical' => true,
-            'show_in_rest' => true,
-        ));
+        // register_taxonomy('asset_category', 'asset_item', array(
+        //     'label' => 'Categories',
+        //     'rewrite' => array('slug' => 'asset-category'),
+        //     'hierarchical' => true,
+        //     'show_in_rest' => true,
+        // ));
 
         // register_taxonomy('asset_manufacturer', 'asset_item', array(
         //     'label' => 'Manufacturers',
@@ -131,6 +131,19 @@ class AMS_REST_API
         $notes = get_post_meta($post->ID, '_notes', true);
         $purchase_date = get_post_meta($post->ID, '_purchase_date', true);
         $purchase_cost = get_post_meta($post->ID, '_purchase_cost', true);
+
+        // Get taxonomy terms
+        // $categories = get_terms(array('taxonomy' => 'asset_category', 'hide_empty' => false));
+        $locations = get_terms(array('taxonomy' => 'asset_location', 'hide_empty' => false));
+        $stores = get_terms(array('taxonomy' => 'asset_store', 'hide_empty' => false));
+        $models = get_terms(array('taxonomy' => 'asset_model', 'hide_empty' => false));
+
+        // Get current terms for the post
+        $current_categories = wp_get_post_terms($post->ID, 'asset_category', array('fields' => 'ids'));
+        $current_locations = wp_get_post_terms($post->ID, 'asset_location', array('fields' => 'ids'));
+        $current_stores = wp_get_post_terms($post->ID, 'asset_store', array('fields' => 'ids'));
+        $current_models = wp_get_post_terms($post->ID, 'asset_model', array('fields' => 'ids'));
+
 
         echo '<table class="form-table">';
         echo '<tr><th><label for="asset_tag">Asset Tag</label></th><td><input type="text" id="asset_tag" name="asset_tag" value="' . esc_attr($asset_tag) . '" class="regular-text" /></td></tr>';
@@ -397,7 +410,7 @@ class AMS_REST_API
 
             return $user;
         } catch (Exception $e) {
-            return new WP_Error('invalid_token', 'Invalid token validate_jwt_token: ' . json_encode($token), array('status' => 401));
+            return new WP_Error('invalid_token', 'Invalid token in validate_jwt_token', array('status' => 401));
         }
     }
 

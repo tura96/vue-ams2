@@ -35,7 +35,7 @@
     white-space: nowrap;
     
     &--checkbox {
-      min-width: 48px;
+      min-width: fit-content;
       text-align: left;
     }
     
@@ -95,7 +95,8 @@
     
     &--checkbox {
       text-align: left;
-      min-width: 48px;
+      min-width: fit-content;
+      white-space: nowrap;
     }
     
     &--actions {

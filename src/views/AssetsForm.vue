@@ -162,18 +162,27 @@
         </button>
       </div>
     </form>
+
+    <!-- Alert Modal -->
+    <AlertModal
+      :is-open="isAlertOpen"
+      :message="alertMessage"
+      :type="alertType"
+      @close="closeAlert"
+    />
   </div>
   <div v-else-if="loading" class="loading">Loading asset data...</div>
   <div v-else-if="error" class="error">{{ error }}</div>
 </template>
 
 <script lang="ts" setup>
-import { ref, reactive, onMounted, onUnmounted , nextTick , watch } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import flatpickr from 'flatpickr'
 import 'flatpickr/dist/flatpickr.css'
 import '@/assets/styles/items.scss'
 import CustomSelect from '@/components/ui/CustomSelect.vue'
+import AlertModal from '@/components/modals/AlertModal.vue'
 import { amsApi, type Asset, type AssetCreateData } from '../services/amsApi'
 
 interface SelectOption {
@@ -201,6 +210,9 @@ const locationSelect = ref<InstanceType<typeof CustomSelect> | null>(null)
 
 const loading = ref(true)
 const error = ref<string | null>(null)
+const isAlertOpen = ref(false)
+const alertMessage = ref('')
+const alertType = ref<'success' | 'error'>('error')
 
 let purchaseDatePicker: any = null
 let warrantyDatePicker: any = null
@@ -288,7 +300,7 @@ async function loadAssetData() {
         warranty_expiry: response.data.warranty_expiry || '',
         notes: response.data.notes || '',
         purchase_date: response.data.purchase_date || '',
-        purchase_cost: response.data.purchase_cost || 0,
+        purchase_cost: response.data.purchase_cost != null ? String(response.data.purchase_cost) : '',
         rfid_tag: response.data.rfid_tag || ''
       })
     } else {
@@ -304,9 +316,24 @@ const goBack = () => {
   router.push('/')
 }
 
+const showAlert = (message: string, type: 'success' | 'error') => {
+  alertMessage.value = message
+  alertType.value = type
+  isAlertOpen.value = true
+}
+
+const closeAlert = () => {
+  isAlertOpen.value = false
+  alertMessage.value = ''
+  alertType.value = 'error' // Reset to default
+  // if (alertType.value === 'success') {
+  //   router.push('/')
+  // }
+}
+
 const saveAsset = async () => {
   if (!asset.asset_tag || !asset.model || !asset.serial_number) {
-    alert('Please fill in all required fields (Asset Tag, Model, Serial Number)')
+    showAlert('Please fill in all required fields (Asset Tag, Model, Serial Number)', 'error')
     return
   }
 
@@ -331,19 +358,17 @@ const saveAsset = async () => {
     if (props.id) {
       const response = await amsApi.updateAsset(Number(props.id), assetData)
       if (response.success) {
-        alert('Asset updated successfully!')
-        router.push('/')
+        showAlert('Asset updated successfully!', 'success')
       }
     } else {
       const response = await amsApi.createAsset(assetData)
       if (response.success) {
-        alert('Asset created successfully!')
-        router.push('/')
+        showAlert('Asset created successfully!', 'success')
       }
     }
   } catch (error) {
     console.error('Error saving asset:', error)
-    alert('Failed to save asset')
+    showAlert('Failed to save asset', 'error')
   }
 }
 
@@ -374,15 +399,16 @@ async function initializeFlatpickr() {
         disableMobile: true,
         onChange: (selectedDates: Date[], dateStr: string) => {
           asset.purchase_date = dateStr
-          // if (import.meta.env.DEV) console.log('purchase_date updated:', dateStr)
+          console.log('Selected purchase_date:', selectedDates)
+          if (import.meta.env.DEV) console.log('purchase_date updated:', dateStr)
         }
       })
       if (asset.purchase_date) {
         purchaseDatePicker.setDate(asset.purchase_date, true, 'd-m-Y')
-        // if (import.meta.env.DEV) console.log('Set purchase_date:', asset.purchase_date)
+        if (import.meta.env.DEV) console.log('Set purchase_date:', asset.purchase_date)
       }
     } catch (err) {
-      // console.error('Failed to initialize purchase_date flatpickr:', err)
+      console.error('Failed to initialize purchase_date flatpickr:', err)
       error.value = 'Failed to initialize date picker'
     }
   } else {
@@ -397,15 +423,16 @@ async function initializeFlatpickr() {
         disableMobile: true,
         onChange: (selectedDates: Date[], dateStr: string) => {
           asset.warranty_expiry = dateStr
-          // if (import.meta.env.DEV) console.log('warranty_expiry updated:', dateStr)
+          console.log('Selected purchase_date:', selectedDates)
+          if (import.meta.env.DEV) console.log('warranty_expiry updated:', dateStr)
         }
       })
       if (asset.warranty_expiry) {
         warrantyDatePicker.setDate(asset.warranty_expiry, true, 'd-m-Y')
-        // if (import.meta.env.DEV) console.log('Set warranty_expiry:', asset.warranty_expiry)
+        if (import.meta.env.DEV) console.log('Set warranty_expiry:', asset.warranty_expiry)
       }
     } catch (err) {
-      // console.error('Failed to initialize warranty_expiry flatpickr:', err)
+      console.error('Failed to initialize warranty_expiry flatpickr:', err)
       error.value = 'Failed to initialize date picker'
     }
   } else {
@@ -448,7 +475,6 @@ onUnmounted(() => {
     if (import.meta.env.DEV) console.log('Destroyed warranty_expiry picker')
   }
 })
-
 </script>
 
 <style scoped lang="scss">

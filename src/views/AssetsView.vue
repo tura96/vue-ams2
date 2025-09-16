@@ -15,13 +15,16 @@
           :status-options="statusOptions"
           :model-options="modelOptions"
           :store-options="storeOptions"
+          :location-options="locationOptions"
           :active-filters="filters"
+          :assets="assets"
+          :selectedAssets="selectedAssets"
           @filter-change="handleFilterChange" 
         />
         <AssetTable 
           :assets="filteredAssets" 
           @edit="editAsset" 
-          @delete="deleteAsset"
+          @delete="openDeleteModal"
           :current-page="currentPage"
           :items-per-page="itemsPerPage"
           :selected-assets="selectedAssets"
@@ -41,6 +44,14 @@
       @page-change="handlePageChange"
       @items-per-page-change="handleItemsPerPageChange"
     />
+    <!-- Delete Confirmation Modal -->
+    <DeleteConfirmationModal
+      :is-open="deleteModal.isOpen"
+      :message="deleteModal.message"
+      :loading="deleteModal.loading"
+      @confirm="confirmDelete"
+      @cancel="closeDeleteModal"
+    />
   </div>
 </template>
 
@@ -51,6 +62,7 @@ import { useAuthStore } from '../stores/auth'
 import AssetFilters from '@/components/assets/AssetFilters.vue'
 import AssetTable from '@/components/assets/AssetTable.vue'
 import Pagination from '@/components/ui/Pagination.vue'
+import DeleteConfirmationModal from '@/components/modals/DeleteConfirmationModal.vue'
 import { amsApi, type Asset, type AssetListParams } from '../services/amsApi'
 
 // --- Types ---
@@ -70,6 +82,7 @@ interface Option {
 const statusOptions = ref<Option[]>([])
 const modelOptions = ref<Option[]>([])
 const storeOptions = ref<Option[]>([])
+const locationOptions = ref<Option[]>([])
 
 // --- Asset state ---
 const assets = ref<Asset[]>([])
@@ -95,9 +108,18 @@ const sortOrder = ref<'ASC' | 'DESC'>('DESC')
 const loading = ref(false)
 const error = ref<string | null>(null)
 
+// --- Modal states ---
+const deleteModal = ref({
+  isOpen: false,
+  loading: false,
+  message: '',
+  targetAsset: null as Asset | null
+})
+
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+
 
 // --- Computed ---
 const filteredAssets = computed(() => {
@@ -122,37 +144,6 @@ function addAsset() {
 
 function editAsset(asset: Asset) {
   router.push(`/items/edit/${asset.id}`)
-}
-
-async function deleteAsset(asset: Asset) {
-  if (confirm(`Are you sure you want to delete asset ${asset.asset_tag}?`)) {
-    try {
-      loading.value = true
-      error.value = null
-      
-      const response = await amsApi.deleteAsset(asset.id)
-      
-      if (response.success) {
-        // Remove from local array
-        assets.value = assets.value.filter(a => a.id !== asset.id)
-        totalItems.value = Math.max(0, totalItems.value - 1)
-        
-        // Remove from selected if it was selected
-        const selectedIndex = selectedAssets.value.indexOf(asset.id)
-        if (selectedIndex > -1) {
-          selectedAssets.value.splice(selectedIndex, 1)
-        }
-        
-        // Reload to get accurate pagination
-        await loadAssets()
-      }
-    } catch (err: any) {
-      error.value = `Failed to delete asset: ${err.message}`
-      console.error('Delete error:', err)
-    } finally {
-      loading.value = false
-    }
-  }
 }
 
 function handleFilterChange(newFilters: Partial<Filters>) {
@@ -243,10 +234,11 @@ async function loadAssets() {
 async function loadFilterOptions() {
   try {
     // Load all filter options in parallel
-    const [statusesRes, modelsRes, locationsRes] = await Promise.all([
+    const [statusesRes, modelsRes, locationsRes , AssignedRes] = await Promise.all([
       amsApi.getStatuses(),
       amsApi.getModels(), 
-      amsApi.getLocations()
+      amsApi.getLocations(),
+      amsApi.getAssigned()
     ])
 
     // Process statuses (API returns { value: label } object)
@@ -261,13 +253,71 @@ async function loadFilterOptions() {
       modelOptions.value = modelsRes.data.map(m => ({ value: m, label: m }))
     }
 
-    // Process locations/stores (API returns string[])
+    // Process stores (API returns string[])
+    if (AssignedRes.success && AssignedRes.data) {
+      storeOptions.value = AssignedRes.data.map(s => ({ value: s, label: s }))
+    }
+    // Process locations (API returns string[])
     if (locationsRes.success && locationsRes.data) {
-      storeOptions.value = locationsRes.data.map(s => ({ value: s, label: s }))
+      locationOptions.value = locationsRes.data.map(s => ({ value: s, label: s }))
     }
   } catch (err: any) {
     console.error('Failed to load filter options:', err)
     error.value = `Failed to load filter options: ${err.message}`
+  }
+}
+
+// Delete Modal Methods
+function openDeleteModal(asset: Asset) {
+  deleteModal.value = {
+    isOpen: true,
+    loading: false,
+    message: `Are you sure you want to delete asset ${asset.asset_tag} - ${asset.title}?`,
+    targetAsset: asset
+  }
+}
+
+function closeDeleteModal() {
+  deleteModal.value = {
+    isOpen: false,
+    loading: false,
+    message: '',
+    targetAsset: null
+  }
+}
+
+async function confirmDelete() {
+  if (!deleteModal.value.targetAsset) return
+  
+  deleteModal.value.loading = true
+  
+  try {
+    const response = await amsApi.deleteAsset(deleteModal.value.targetAsset.id)
+    
+    if (response.success) {
+      // Remove from local array
+      assets.value = assets.value.filter(a => a.id !== deleteModal.value.targetAsset!.id)
+      totalItems.value = Math.max(0, totalItems.value - 1)
+      
+      // Remove from selected if it was selected
+      const selectedIndex = selectedAssets.value.indexOf(deleteModal.value.targetAsset.id)
+      if (selectedIndex > -1) {
+        selectedAssets.value.splice(selectedIndex, 1)
+      }
+      
+      closeDeleteModal()
+      
+      // Reload to get accurate pagination if needed
+      if (assets.value.length === 0 && currentPage.value > 1) {
+        currentPage.value = currentPage.value - 1
+        await loadAssets()
+      }
+    }
+  } catch (err: any) {
+    error.value = `Failed to delete asset: ${err.message}`
+    console.error('Delete error:', err)
+  } finally {
+    deleteModal.value.loading = false
   }
 }
 

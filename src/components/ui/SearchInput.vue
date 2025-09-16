@@ -46,11 +46,6 @@ const inputRef = ref<HTMLInputElement | null>(null)
 const computedLabel = computed(() => props.label || 'Search')
 const computedPlaceholder = computed(() => props.placeholder || 'Search...')
 
-// Input event handler for real-time updates
-function onInput(event: Event) {
-  const input = event.target as HTMLInputElement
-  emit('update:modelValue', input.value)
-}
 
 // Icon click handler
 function onSearchClick() {

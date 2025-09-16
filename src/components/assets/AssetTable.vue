@@ -105,7 +105,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import AssetStatus from './AssetStatus.vue'
 import AssetActions from './AssetActions.vue'

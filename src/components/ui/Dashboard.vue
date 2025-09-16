@@ -2,7 +2,7 @@
   <div class="dashboard">
     <header>
       <h1>Welcome, {{ authStore.user?.display_name }}</h1>
-      <button v-if="authStore.isLoggedIn" @click="handleLogout">Logout</button>
+      <button class="btn btn--primary" v-if="authStore.isLoggedIn" @click="handleLogout">Logout</button>
     </header>
 
     <div class="posts-section">

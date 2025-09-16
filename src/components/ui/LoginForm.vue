@@ -1,5 +1,6 @@
 <template>
   <div class="login-form">
+    <h2>VUE-AMS Login</h2>
     <form @submit.prevent="handleLogin">
       <div class="form-group">
         <label for="username">Username:</label>

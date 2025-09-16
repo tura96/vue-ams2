@@ -2,9 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAssetStore } from '../stores/assets'
 import AssetsView from '@/views/AssetsView.vue'
 import AssetsForm from '@/views/AssetsForm.vue'
-import LoginForm from '@/components/ui/LoginForm.vue'
 import Dashboard from '@/components/ui/Dashboard.vue'
-import AuthTest from '@/components/ui/AuthTest.vue'
+import ErrorPage from '@/components/layout/ErrorPage.vue'
 
 
 const routes = [
@@ -27,12 +26,12 @@ const routes = [
     meta: { title: 'Edit Asset' },
     props: true // Pass route params as props to the component
   },
-  {
-    path: '/login',
-    name: 'Login ',
-    component: LoginForm,
-    meta: { title: 'Login Form' }
-  },
+  // {
+  //   path: '/login',
+  //   name: 'Login ',
+  //   component: LoginForm,
+  //   meta: { title: 'Login Form' }
+  // },
   {
     path: '/dashboard',
     name: 'Dashboard',
@@ -40,10 +39,9 @@ const routes = [
     meta: { title: 'Dashboard' }
   },
   {
-    path: '/authtest',
-    name: 'AuthTest',
-    component: AuthTest,
-    meta: { title: 'AuthTest' }
+    path: '/:pathMatch(.*)*', // Catch all other routes
+    name: 'ErrorPage',
+    component: ErrorPage
   }
 ]
 
@@ -56,7 +54,7 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to) => {
   const assetStore = useAssetStore()
   let title = to.meta.title || 'Asset Management'
 
@@ -94,7 +92,7 @@ router.beforeEach(async (to, from, next) => {
 
   document.title = `${title} - Asset Management`
   to.meta.dynamicTitle = title
-  next()
+  // next()
 })
 
 // Update page title based on route meta
