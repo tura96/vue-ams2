@@ -2,16 +2,23 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAssetStore } from '../stores/assets'
 import AssetsView from '@/views/AssetsView.vue'
 import AssetsForm from '@/views/AssetsForm.vue'
+import AssetsModels from '@/views/AssetsModels.vue'
 import Dashboard from '@/components/ui/Dashboard.vue'
-import ErrorPage from '@/components/layout/ErrorPage.vue'
+// import ErrorPage from '@/components/layout/ErrorPage.vue'
 
 
 const routes = [
   {
-    path: '/',
+    path: '/assets/items',
     name: 'Asset Items',
     component: AssetsView,
     meta: { title: 'Asset Items' }
+  },
+  {
+    path: '/assets/models',
+    name: 'Assets Models',
+    component: AssetsModels,
+    meta: { title: 'Assets Models' }
   },
   {
     path: '/items',
@@ -34,15 +41,21 @@ const routes = [
   // },
   {
     path: '/dashboard',
+    name: 'Dashboard view',
+    component: Dashboard,
+    meta: { title: 'Dashboard view' }
+  },
+  {
+    path: '/',
     name: 'Dashboard',
     component: Dashboard,
     meta: { title: 'Dashboard' }
   },
-  {
-    path: '/:pathMatch(.*)*', // Catch all other routes
-    name: 'ErrorPage',
-    component: ErrorPage
-  }
+  // {
+  //   path: '/:pathMatch(.*)*', // Catch all other routes
+  //   name: 'ErrorPage',
+  //   component: ErrorPage
+  // }
 ]
 
 // const router = createRouter({

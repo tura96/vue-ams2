@@ -20,14 +20,24 @@
              alt="Expand" class="sidebar__user-toggle">
       </div>
 
-      <NavItem v-for="item in navItems" :key="item.label" v-bind="item" />
-      
-      <NavSubmenu 
-        title="Asset Management" 
-        :icon="mdiAssetManagement"
-        :items="assetSubItems"
-        :expanded="true"
-      />
+      <!-- Render menu items dynamically -->
+      <template v-for="item in navItems" :key="item.label">
+        <!-- If item has submenu, render as NavSubmenu -->
+        <NavSubmenu 
+          v-if="item.submenu && item.submenu.length > 0"
+          :title="item.label" 
+          :icon="item.icon"
+          :items="getSubmenuWithActiveState(item.submenu)"
+          :expanded="item.expanded || false"
+        />
+        <!-- Otherwise render as regular NavItem -->
+        <NavItem 
+          v-else
+          :href="item.href" 
+          :icon="item.icon" 
+          :label="item.label"
+        />
+      </template>
     </nav>
     
     <div class="sidebar__collapse">
@@ -45,11 +55,12 @@
 <script lang="ts" setup>
 import { ref } from 'vue';
 import { storeToRefs } from 'pinia'
+import { useRoute } from 'vue-router'
 import { useUIStore } from '../../stores/ui'
 import NavItem from '@/components/navigation/NavItem.vue';
 import NavSubmenu from '@/components/navigation/NavSubmenu.vue';
 
-// Import icons for navItems and assetSubItems
+// Import icons
 import dashboardIcon from '@/assets/images/icons/mdi_view-dashboard-outline.svg';
 import ticketIcon from '@/assets/images/icons/mdi_ticket-outline.svg';
 import calendarIcon from '@/assets/images/icons/mdi_calendar-range-outline.svg';
@@ -65,20 +76,11 @@ import storeIcon from '@/assets/images/icons/material-symbols_store-outline-roun
 import categoryIcon from '@/assets/images/icons/mdi_category-outline.svg';
 import manufacturerIcon from '@/assets/images/icons/material-symbols_precision-manufacturing-outline-rounded.svg';
 
-// const isCollapsed = ref(false);
 const userName = ref('Neo');
 const userRole = ref('Requester');
 
-// // Define props
-// const props = defineProps<{
-//   isCollapsed: boolean;
-// }>();
-// console.log('Header prop: ', props)
-
-// // Define emits
-// const emit = defineEmits<{
-//   (e: 'toggle'): void;
-// }>();
+// Router setup
+const route = useRoute()
 
 // use the UI store
 const uiStore = useUIStore()
@@ -88,33 +90,109 @@ function toggleSidebar() {
   uiStore.toggleSidebar()
 }
 
+// Function to add active state to submenu items based on current route
+const getSubmenuWithActiveState = (submenuItems: any[]) => {
+  return submenuItems.map(item => {
+    let isActive = route.path === item.href;
+    
+    // Check if item has activePatterns and match against current route
+    if (item.activePatterns && Array.isArray(item.activePatterns)) {
+      isActive = isActive || item.activePatterns.some((pattern: string) => {
+        // Convert pattern to regex, replacing :id with [0-9]+ for numeric IDs
+        const regexPattern = pattern.replace(/:id/g, '[0-9]+');
+        const regex = new RegExp(`^${regexPattern}$`);
+        return regex.test(route.path);
+      });
+    }
+    
+    return {
+      ...item,
+      active: isActive
+    };
+  });
+}
+
+// Define menu structure with submenu support
 const navItems = [
   { href: '/dashboard', icon: dashboardIcon, label: 'Dashboard' },
   { href: '#', icon: ticketIcon, label: 'Service Tickets' },
   { href: '#', icon: calendarIcon, label: "Engineer's Daily Schedule" },
-  { href: '#', icon: reportIcon, label: 'Statistical Report', expandable: true },
-  { href: '#', icon: systemIcon, label: 'System Manager', expandable: true },
-  { href: '#', icon: settingsIcon, label: 'Settings', expandable: true },
-  { href: '#', icon: userGroupIcon, label: 'User Management', expandable: true },
-  { href: '#', icon: materialRequestIcon, label: 'Material Request', expandable: true },
+  
+  // Statistical Report with submenu
+  { 
+    icon: reportIcon, 
+    label: 'Statistical Report',
+    expanded: false,
+    submenu: [
+      { href: '/reports/daily', icon: reportIcon, name: 'Daily Reports' },
+      { href: '/reports/monthly', icon: reportIcon, name: 'Monthly Reports' },
+      { href: '/reports/yearly', icon: reportIcon, name: 'Yearly Reports' },
+    ]
+  },
+  
+  // System Manager with submenu
+  { 
+    icon: systemIcon, 
+    label: 'System Manager',
+    expanded: false,
+    submenu: [
+      { href: '/system/logs', icon: systemIcon, name: 'System Logs' },
+      { href: '/system/backup', icon: systemIcon, name: 'Backup & Restore' },
+      { href: '/system/maintenance', icon: systemIcon, name: 'Maintenance' },
+    ]
+  },
+  
+  // Settings with submenu
+  { 
+    icon: settingsIcon, 
+    label: 'Settings',
+    expanded: false,
+    submenu: [
+      { href: '/settings/general', icon: settingsIcon, name: 'General Settings' },
+      { href: '/settings/notifications', icon: settingsIcon, name: 'Notifications' },
+      { href: '/settings/security', icon: settingsIcon, name: 'Security' },
+    ]
+  },
+  
+  // User Management with submenu
+  { 
+    icon: userGroupIcon, 
+    label: 'User Management',
+    expanded: false,
+    submenu: [
+      { href: '/users/list', icon: userGroupIcon, name: 'User List' },
+      { href: '/users/roles', icon: userGroupIcon, name: 'Roles & Permissions' },
+      { href: '/users/groups', icon: userGroupIcon, name: 'User Groups' },
+    ]
+  },
+  
+  // Material Request with submenu
+  { 
+    icon: materialRequestIcon, 
+    label: 'Material Request',
+    expanded: false,
+    submenu: [
+      { href: '/materials/requests', icon: materialRequestIcon, name: 'Request List' },
+      { href: '/materials/approval', icon: materialRequestIcon, name: 'Approval Queue' },
+      { href: '/materials/history', icon: materialRequestIcon, name: 'Request History' },
+    ]
+  },
+  
+  // Asset Management with submenu (expanded by default)
+  { 
+    icon: mdiAssetManagement, 
+    label: 'Asset Management',
+    expanded: true,
+    submenu: [
+      { href: '/assets/dashboard', icon: dashboardIcon, name: 'Dashboard' },
+      { href: '/assets/models', icon: assetModelIcon, name: 'Asset Model' },
+      { href: '/assets/items', icon: assetItemIcon, name: 'Asset Items', activePatterns: ['/assets/:id'] },
+      { href: '/assets/locations', icon: storeIcon, name: 'Store And Location' },
+      { href: '/assets/categories', icon: categoryIcon, name: 'Category' },
+      { href: '/assets/manufacturers', icon: manufacturerIcon, name: 'Manufacturer' },
+    ]
+  },
 ];
-
-const assetSubItems = [
-  { href: '#', icon: dashboardIcon, name: 'Dashboard' },
-  { href: '#', icon: assetModelIcon, name: 'Asset Model' },
-  { href: '/', icon: assetItemIcon, name: 'Asset Items', active: true },
-  { href: '#', icon: storeIcon, name: 'Store And Location' },
-  { href: '#', icon: categoryIcon, name: 'Category' },
-  { href: '#', icon: manufacturerIcon, name: 'Manufacturer' },
-];
-
-// function toggleSidebar() {
-//   isCollapsed.value = !isCollapsed.value;
-// }
-
-// function toggleSidebar() {
-//   emit('toggle');
-// }
 </script>
 
 <style scoped lang="scss">

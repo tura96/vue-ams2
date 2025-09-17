@@ -69,10 +69,10 @@
               :checked="isSelected(asset.id)"
               @change="toggleSelect(asset.id)"
             />
-            {{ asset.id }}
+            {{ asset.id || '-'}}
           </td>
           <td class="table__cell">
-            <span class="asset-tag">{{ asset.asset_tag }}</span>
+            <span class="asset-tag">{{ asset.asset_tag || '-'}}</span>
             <img
               src="/assets/images/icons/mdi_content-copy.svg"
               alt="Copy"
@@ -80,14 +80,14 @@
               @click="copyToClipboard(asset.asset_tag)"
             />
           </td>
-          <td class="table__cell">{{ asset.model }}</td>
-          <td class="table__cell">{{ asset.serial_number }}</td>
+          <td class="table__cell">{{ asset.model || '-'}}</td>
+          <td class="table__cell">{{ asset.serial_number || '-'}}</td>
           <td class="table__cell">
-            <AssetStatus :status="asset.status" />
+            <AssetStatus :status="asset.status || 'undefined'" />
           </td>
           <td class="table__cell">{{ asset.assigned_to || '-' }}</td>
           <td class="table__cell">{{ asset.location || '-' }}</td>
-          <td class="table__cell">{{ formatDate(asset.warranty_expiry) }}</td>
+          <td class="table__cell">{{ formatDate(asset.warranty_expiry) || '-'}}</td>
           <td class="table__cell">{{ asset.notes }}</td>
           <td class="table__cell table__cell--actions">
             <AssetActions

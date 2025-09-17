@@ -32,6 +32,87 @@ class AMS_REST_API
         $this->setup_jwt_authentication();
         // Hook into WP login for wp-admin
         add_action('wp_login', array($this, 'set_admin_token_cookie'), 10, 2);
+        add_action('admin_init', array($this, 'handle_admin_actions'));
+    }
+
+    /**
+     * Handle custom admin actions
+     */
+    public function handle_admin_actions()
+    {
+        // Check if our custom action is being triggered
+        if (isset($_GET['ams_action']) && $_GET['ams_action'] === 'save_all_assets') {
+            
+            // Verify nonce for security
+            // if (!isset($_GET['_wpnonce']) || !wp_verify_nonce($_GET['_wpnonce'], 'ams_save_all_assets')) {
+            //     wp_die('Security check failed');
+            // }
+            
+            // Check user permissions
+            if (!current_user_can('manage_options')) {
+                wp_die('You do not have sufficient permissions to perform this action.');
+            }
+            
+            $result = $this->save_all_assets();
+            
+            // Redirect back with result message
+            $redirect_url = add_query_arg(array(
+                'ams_message' => $result['success'] ? 'success' : 'error',
+                'ams_count' => $result['count'],
+                'ams_errors' => $result['errors']
+            ), admin_url('edit.php?post_type=asset_item'));
+            
+            wp_redirect($redirect_url);
+            exit;
+        }
+    }
+
+    /**
+     * Save all asset posts
+     */
+    private function save_all_assets()
+    {
+        $args = array(
+            'post_type' => 'asset_item',
+            'post_status' => 'publish',
+            'posts_per_page' => -1, // Get all posts
+            'fields' => 'ids', // Only get IDs for efficiency
+        );
+        
+        $asset_ids = get_posts($args);
+        $saved_count = 0;
+        $errors = 0;
+        
+        foreach ($asset_ids as $asset_id) {
+            // Trigger save_post hook for each asset
+            $post = get_post($asset_id);
+            if ($post) {
+                // Update post to trigger save_post hooks
+                $updated = wp_update_post(array(
+                    'ID' => $asset_id,
+                    'post_modified' => current_time('mysql'),
+                    'post_modified_gmt' => current_time('mysql', 1)
+                ));
+                
+                if ($updated && !is_wp_error($updated)) {
+                    $saved_count++;
+                    
+                    // Optional: Perform additional processing here
+                    // For example, validate and fix date formats
+                    // $this->validate_and_fix_asset_dates($asset_id);
+                    
+                } else {
+                    $errors++;
+                }
+            }
+        }
+        
+        return array(
+            'success' => $errors === 0,
+            'count' => $saved_count,
+            'errors' => $errors,
+            'total' => count($asset_ids)
+        );
     }
 
     /**
@@ -132,6 +213,10 @@ class AMS_REST_API
         $purchase_date = get_post_meta($post->ID, '_purchase_date', true);
         $purchase_cost = get_post_meta($post->ID, '_purchase_cost', true);
 
+        // Convert date fields from d-m-Y to Y-m-d for HTML date input
+        $warranty_expiry_input = $this->convert_date_for_input($warranty_expiry);
+        $purchase_date_input = $this->convert_date_for_input($purchase_date);
+
         // Get taxonomy terms
         // $categories = get_terms(array('taxonomy' => 'asset_category', 'hide_empty' => false));
         $locations = get_terms(array('taxonomy' => 'asset_location', 'hide_empty' => false));
@@ -161,8 +246,8 @@ class AMS_REST_API
         echo '<tr><th><label for="assigned_to">Assigned To</label></th><td><input type="text" id="assigned_to" name="assigned_to" value="' . esc_attr($assigned_to) . '" class="regular-text" /></td></tr>';
         echo '<tr><th><label for="location">Location</label></th><td><input type="text" id="location" name="location" value="' . esc_attr($location) . '" class="regular-text" /></td></tr>';
         echo '<tr><th><label for="rfid_tag">Rfid tag</label></th><td><input type="text" id="rfid_tag" name="rfid_tag" value="' . esc_attr($rfid_tag) . '" class="regular-text" /></td></tr>';
-        echo '<tr><th><label for="warranty_expiry">Warranty Expiry</label></th><td><input type="date" id="warranty_expiry" name="warranty_expiry" value="' . esc_attr($warranty_expiry) . '" class="regular-text" /></td></tr>';
-        echo '<tr><th><label for="purchase_date">Purchase Date</label></th><td><input type="date" id="purchase_date" name="purchase_date" value="' . esc_attr($purchase_date) . '" class="regular-text" /></td></tr>';
+        echo '<tr><th><label for="warranty_expiry">Warranty Expiry</label></th><td><input type="date" id="warranty_expiry" name="warranty_expiry" value="' . esc_attr($warranty_expiry_input) . '" class="regular-text" /></td></tr>';
+        echo '<tr><th><label for="purchase_date">Purchase Date</label></th><td><input type="date" id="purchase_date" name="purchase_date" value="' . esc_attr($purchase_date_input) . '" class="regular-text" /></td></tr>';
         echo '<tr><th><label for="purchase_cost">Purchase Cost</label></th><td><input type="number" step="0.01" id="purchase_cost" name="purchase_cost" value="' . esc_attr($purchase_cost) . '" class="regular-text" /></td></tr>';
         echo '<tr><th><label for="notes">Notes</label></th><td><textarea id="notes" name="notes" rows="4" class="large-text">' . esc_textarea($notes) . '</textarea></td></tr>';
         echo '</table>';
@@ -200,7 +285,15 @@ class AMS_REST_API
 
         foreach ($meta_fields as $field) {
             if (isset($_POST[$field])) {
-                update_post_meta($post_id, '_' . $field, sanitize_text_field($_POST[$field]));
+                // update_post_meta($post_id, '_' . $field, sanitize_text_field($_POST[$field]));
+                $value = sanitize_text_field($_POST[$field]);
+        
+                // Convert date fields from Y-m-d (HTML input format) to d-m-Y for storage
+                if (in_array($field, array('warranty_expiry', 'purchase_date')) && !empty($value)) {
+                    $value = $this->convert_date_for_storage($value);
+                }
+                
+                update_post_meta($post_id, '_' . $field, $value);
             }
         }
     }
@@ -212,7 +305,7 @@ class AMS_REST_API
     {
         // Add JWT secret to wp-config.php
         if (!defined('JWT_AUTH_SECRET_KEY')) {
-            define('JWT_AUTH_SECRET_KEY', '170596');
+            define('JWT_AUTH_SECRET_KEY', '0704648eaf0077561235cf4906d101e0');
         }
 
         // Enable CORS
@@ -1137,6 +1230,51 @@ class AMS_REST_API
             error_log('AMS Token cookie set for user: ' . $user->user_login);
             error_log('Token preview: ' . substr($token, 0, 20) . '...');
         }
+    }
+    /**
+     * Convert date from d-m-Y (storage format) to Y-m-d (HTML input format)
+     */
+    private function convert_date_for_input($date_string)
+    {
+        if (empty($date_string)) {
+            return '';
+        }
+
+        // Check if already in Y-m-d format
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_string)) {
+            return $date_string;
+        }
+
+        // Convert from d-m-Y to Y-m-d
+        $date = DateTime::createFromFormat('d-m-Y', $date_string);
+        if ($date !== false) {
+            return $date->format('Y-m-d');
+        }
+
+        return $date_string; // Return original if can't parse
+    }
+
+    /**
+     * Convert date from Y-m-d (HTML input format) to d-m-Y (storage format)
+     */
+    private function convert_date_for_storage($date_string)
+    {
+        if (empty($date_string)) {
+            return '';
+        }
+
+        // Check if already in d-m-Y format
+        if (preg_match('/^\d{2}-\d{2}-\d{4}$/', $date_string)) {
+            return $date_string;
+        }
+
+        // Convert from Y-m-d to d-m-Y
+        $date = DateTime::createFromFormat('Y-m-d', $date_string);
+        if ($date !== false) {
+            return $date->format('d-m-Y');
+        }
+
+        return $date_string; // Return original if can't parse
     }
 }
 

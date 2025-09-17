@@ -313,7 +313,7 @@ async function loadAssetData() {
 }
 
 const goBack = () => {
-  router.push('/')
+  router.push('/assets/items')
 }
 
 const showAlert = (message: string, type: 'success' | 'error') => {

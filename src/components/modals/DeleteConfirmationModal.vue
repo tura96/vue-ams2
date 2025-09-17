@@ -42,10 +42,10 @@ interface Emits {
   (e: 'cancel'): void
 }
 
-// defineProps<Props>()
+defineProps<Props>()
 // defineEmits<Emits>()
 
-const props = defineProps<Props>()
+// const props = defineProps<Props>()
 const emit = defineEmits<Emits>() 
 
 const handleOverlayClick = (event: MouseEvent) => {

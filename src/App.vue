@@ -1,6 +1,6 @@
 <template>
-  <div v-if="loading" class="loading">Checking authentication...</div>
-  <LoginForm v-else-if="!authStore.isAuthenticated" />
+  <!-- <div v-if="loading" class="loading">Checking authentication...</div> -->
+  <LoginForm v-if="!authStore.isAuthenticated" />
   <AppLayout v-else />
 </template>
 
