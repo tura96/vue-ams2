@@ -236,3 +236,159 @@
     font-weight: var(--font-weight-medium);
   }
 }
+
+// Empty State Styles
+.asset-table-wrapper {
+  width: 100%;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+  background: #fafafa;
+  border: 2px dashed #e5e5e5;
+  border-radius: 12px;
+  min-height: 400px;
+
+  &__icon {
+    margin-bottom: 1.5rem;
+    color: #9ca3af;
+    
+    svg {
+      width: 64px;
+      height: 64px;
+    }
+  }
+
+  &__title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 1rem;
+  }
+
+  &__description {
+    font-size: 1rem;
+    color: #6b7280;
+    line-height: 1.6;
+    max-width: 500px;
+    margin-bottom: 2rem;
+  }
+
+  &__actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  &--error {
+    .empty-state__icon {
+      color: #dc2626;
+    }
+  }
+
+  &--filtered {
+    background: #fef3c7;
+    border-color: #f59e0b;
+    
+    .empty-state__icon {
+      color: #d97706;
+    }
+  }
+
+  &--initial {
+    background: #f0f9ff;
+    border-color: #0ea5e9;
+    
+    .empty-state__icon {
+      color: #0284c7;
+    }
+  }
+}
+
+// Loading Spinner
+.loading-spinner {
+  color: #3b82f6;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+// Existing styles for sorting icons
+.table__sort-icon {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+  cursor: pointer;
+  
+  &--neutral {
+    opacity: 0.5;
+  }
+  
+  &--asc {
+    opacity: 1;
+  }
+  
+  &--desc {
+    opacity: 1;
+  }
+}
+
+.table__header--sortable {
+  cursor: pointer;
+  user-select: none;
+  
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+}
+
+.asset-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.asset-tag__copy {
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+  
+  &:hover {
+    opacity: 1;
+  }
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .empty-state {
+    padding: 2rem 1rem;
+    min-height: 300px;
+
+    &__title {
+      font-size: 1.25rem;
+    }
+
+    &__description {
+      font-size: 0.875rem;
+    }
+
+    &__actions {
+      flex-direction: column;
+      align-items: stretch;
+      
+      .btn {
+        justify-content: center;
+      }
+    }
+  }
+}

@@ -30,6 +30,7 @@
           :selected-assets="selectedAssets"
           :current-sort-by="sortBy"
           :current-sort-order="sortOrder"
+          @clear-filters="clearAllFilters"
           @select-all="handleSelectAll"
           @select="handleSelect"
           @sort="handleSort" 
@@ -103,6 +104,17 @@ const totalItems = ref(0)
 const totalPages = ref(0)
 const sortBy = ref<string>('date')
 const sortOrder = ref<'ASC' | 'DESC'>('DESC')
+const clearAllFilters = () => {
+  filters.value = {
+    search: '',
+    status: '',
+    model: '',
+    store: ''
+  }
+  selectedAssets.value = []
+  currentPage.value = 1
+  loadAssets()
+}
 
 // --- Loading & Error state ---
 const loading = ref(false)
