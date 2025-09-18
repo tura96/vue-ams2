@@ -34,9 +34,9 @@ const route = useRoute();
 const currentRouteTitle = computed(() => route.meta.dynamicTitle || route.meta.title || 'Asset Management')
 
 function toggleSidebar() {
-  console.log('toggleSidebar called, current isSidebarCollapsed:', isSidebarCollapsed.value);
+  // console.log('toggleSidebar called, current isSidebarCollapsed:', isSidebarCollapsed.value);
   isSidebarCollapsed.value = !isSidebarCollapsed.value;
-  console.log('New isSidebarCollapsed:', isSidebarCollapsed.value);
+  // console.log('New isSidebarCollapsed:', isSidebarCollapsed.value);
 }
 </script>
 

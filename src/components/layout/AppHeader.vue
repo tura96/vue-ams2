@@ -35,6 +35,6 @@ const emit = defineEmits<{
 // --- Methods ---
 function toggleMobileMenu() {
   emit('toggle-sidebar')
-  console.log('click mobile')
+  // console.log('click mobile')
 }
 </script>

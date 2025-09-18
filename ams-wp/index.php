@@ -1,10 +1,10 @@
 <?php
 /**
- * Asset Management System (AMS) REST API Plugin
+ * Asset Management System (AMS) REST API Plugin - Secured Version
  * 
  * Plugin Name: AMS REST API
  * Description: Custom REST API for Asset Management System with JWT Authentication
- * Version: 2.0.0
+ * Version: 2.1.0
  * Author: Tee
  */
 
@@ -12,6 +12,12 @@
 if (!defined('ABSPATH')) {
     exit;
 }
+
+// Include Firebase JWT library (you need to install via Composer or manually)
+// composer require firebase/php-jwt
+require_once plugin_dir_path(__FILE__) . 'vendor/autoload.php';
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
 
 class AMS_REST_API
 {
@@ -36,17 +42,17 @@ class AMS_REST_API
     }
 
     /**
-     * Handle custom admin actions
+     * Handle custom admin actions with proper security
      */
     public function handle_admin_actions()
     {
         // Check if our custom action is being triggered
-        if (isset($_GET['ams_action']) && $_GET['ams_action'] === 'save_all_assets') {
+        if (isset($_GET['ams_action']) && sanitize_text_field($_GET['ams_action']) === 'save_all_assets') {
             
             // Verify nonce for security
-            // if (!isset($_GET['_wpnonce']) || !wp_verify_nonce($_GET['_wpnonce'], 'ams_save_all_assets')) {
-            //     wp_die('Security check failed');
-            // }
+            if (!isset($_GET['_wpnonce']) || !wp_verify_nonce(sanitize_text_field($_GET['_wpnonce']), 'ams_save_all_assets')) {
+                wp_die('Security check failed');
+            }
             
             // Check user permissions
             if (!current_user_can('manage_options')) {
@@ -72,19 +78,26 @@ class AMS_REST_API
      */
     private function save_all_assets()
     {
-        $args = array(
-            'post_type' => 'asset_item',
-            'post_status' => 'publish',
-            'posts_per_page' => -1, // Get all posts
-            'fields' => 'ids', // Only get IDs for efficiency
-        );
+        global $wpdb;
         
-        $asset_ids = get_posts($args);
+        // Use prepared statement for security
+        $asset_ids = $wpdb->get_col($wpdb->prepare("
+            SELECT ID FROM {$wpdb->posts} 
+            WHERE post_type = %s 
+            AND post_status = %s
+        ", 'asset_item', 'publish'));
+        
         $saved_count = 0;
         $errors = 0;
         
         foreach ($asset_ids as $asset_id) {
-            // Trigger save_post hook for each asset
+            // Validate asset_id is numeric
+            $asset_id = intval($asset_id);
+            if ($asset_id <= 0) {
+                $errors++;
+                continue;
+            }
+            
             $post = get_post($asset_id);
             if ($post) {
                 // Update post to trigger save_post hooks
@@ -96,11 +109,6 @@ class AMS_REST_API
                 
                 if ($updated && !is_wp_error($updated)) {
                     $saved_count++;
-                    
-                    // Optional: Perform additional processing here
-                    // For example, validate and fix date formats
-                    // $this->validate_and_fix_asset_dates($asset_id);
-                    
                 } else {
                     $errors++;
                 }
@@ -154,21 +162,6 @@ class AMS_REST_API
 
         register_post_type('asset_item', $args);
 
-        // Register taxonomies
-        // register_taxonomy('asset_category', 'asset_item', array(
-        //     'label' => 'Categories',
-        //     'rewrite' => array('slug' => 'asset-category'),
-        //     'hierarchical' => true,
-        //     'show_in_rest' => true,
-        // ));
-
-        // register_taxonomy('asset_manufacturer', 'asset_item', array(
-        //     'label' => 'Manufacturers',
-        //     'rewrite' => array('slug' => 'asset-manufacturer'),
-        //     'hierarchical' => true,
-        //     'show_in_rest' => true,
-        // ));
-
         register_taxonomy('asset_location', 'asset_item', array(
             'label' => 'Locations',
             'rewrite' => array('slug' => 'asset-location'),
@@ -200,35 +193,22 @@ class AMS_REST_API
     {
         wp_nonce_field('save_asset_meta', 'asset_meta_nonce');
 
-        // Get existing values
-        $asset_tag = get_post_meta($post->ID, '_asset_tag', true);
-        $model = get_post_meta($post->ID, '_model', true);
-        $serial_number = get_post_meta($post->ID, '_serial_number', true);
-        $status = get_post_meta($post->ID, '_status', true);
-        $assigned_to = get_post_meta($post->ID, '_assigned_to', true);
-        $location = get_post_meta($post->ID, '_location', true);
-        $rfid_tag = get_post_meta($post->ID, '_rfid_tag', true);
-        $warranty_expiry = get_post_meta($post->ID, '_warranty_expiry', true);
-        $notes = get_post_meta($post->ID, '_notes', true);
-        $purchase_date = get_post_meta($post->ID, '_purchase_date', true);
-        $purchase_cost = get_post_meta($post->ID, '_purchase_cost', true);
+        // Get existing values with proper sanitization
+        $asset_tag = sanitize_text_field(get_post_meta($post->ID, '_asset_tag', true));
+        $model = sanitize_text_field(get_post_meta($post->ID, '_model', true));
+        $serial_number = sanitize_text_field(get_post_meta($post->ID, '_serial_number', true));
+        $status = sanitize_text_field(get_post_meta($post->ID, '_status', true));
+        $assigned_to = sanitize_text_field(get_post_meta($post->ID, '_assigned_to', true));
+        $location = sanitize_text_field(get_post_meta($post->ID, '_location', true));
+        $rfid_tag = sanitize_text_field(get_post_meta($post->ID, '_rfid_tag', true));
+        $warranty_expiry = sanitize_text_field(get_post_meta($post->ID, '_warranty_expiry', true));
+        $notes = sanitize_textarea_field(get_post_meta($post->ID, '_notes', true));
+        $purchase_date = sanitize_text_field(get_post_meta($post->ID, '_purchase_date', true));
+        $purchase_cost = floatval(get_post_meta($post->ID, '_purchase_cost', true));
 
         // Convert date fields from d-m-Y to Y-m-d for HTML date input
         $warranty_expiry_input = $this->convert_date_for_input($warranty_expiry);
         $purchase_date_input = $this->convert_date_for_input($purchase_date);
-
-        // Get taxonomy terms
-        // $categories = get_terms(array('taxonomy' => 'asset_category', 'hide_empty' => false));
-        $locations = get_terms(array('taxonomy' => 'asset_location', 'hide_empty' => false));
-        $stores = get_terms(array('taxonomy' => 'asset_store', 'hide_empty' => false));
-        $models = get_terms(array('taxonomy' => 'asset_model', 'hide_empty' => false));
-
-        // Get current terms for the post
-        $current_categories = wp_get_post_terms($post->ID, 'asset_category', array('fields' => 'ids'));
-        $current_locations = wp_get_post_terms($post->ID, 'asset_location', array('fields' => 'ids'));
-        $current_stores = wp_get_post_terms($post->ID, 'asset_store', array('fields' => 'ids'));
-        $current_models = wp_get_post_terms($post->ID, 'asset_model', array('fields' => 'ids'));
-
 
         echo '<table class="form-table">';
         echo '<tr><th><label for="asset_tag">Asset Tag</label></th><td><input type="text" id="asset_tag" name="asset_tag" value="' . esc_attr($asset_tag) . '" class="regular-text" /></td></tr>';
@@ -239,13 +219,13 @@ class AMS_REST_API
         echo '<select id="status" name="status">';
         $statuses = array('new', 'staging', 'ready', 'defected', 'maintenance', 'archived', 'disposed', 'return');
         foreach ($statuses as $status_option) {
-            echo '<option value="' . $status_option . '"' . selected($status, $status_option, false) . '>' . ucfirst(str_replace('_', ' ', $status_option)) . '</option>';
+            echo '<option value="' . esc_attr($status_option) . '"' . selected($status, $status_option, false) . '>' . esc_html(ucfirst(str_replace('_', ' ', $status_option))) . '</option>';
         }
         echo '</select></td></tr>';
 
         echo '<tr><th><label for="assigned_to">Assigned To</label></th><td><input type="text" id="assigned_to" name="assigned_to" value="' . esc_attr($assigned_to) . '" class="regular-text" /></td></tr>';
         echo '<tr><th><label for="location">Location</label></th><td><input type="text" id="location" name="location" value="' . esc_attr($location) . '" class="regular-text" /></td></tr>';
-        echo '<tr><th><label for="rfid_tag">Rfid tag</label></th><td><input type="text" id="rfid_tag" name="rfid_tag" value="' . esc_attr($rfid_tag) . '" class="regular-text" /></td></tr>';
+        echo '<tr><th><label for="rfid_tag">RFID Tag</label></th><td><input type="text" id="rfid_tag" name="rfid_tag" value="' . esc_attr($rfid_tag) . '" class="regular-text" /></td></tr>';
         echo '<tr><th><label for="warranty_expiry">Warranty Expiry</label></th><td><input type="date" id="warranty_expiry" name="warranty_expiry" value="' . esc_attr($warranty_expiry_input) . '" class="regular-text" /></td></tr>';
         echo '<tr><th><label for="purchase_date">Purchase Date</label></th><td><input type="date" id="purchase_date" name="purchase_date" value="' . esc_attr($purchase_date_input) . '" class="regular-text" /></td></tr>';
         echo '<tr><th><label for="purchase_cost">Purchase Cost</label></th><td><input type="number" step="0.01" id="purchase_cost" name="purchase_cost" value="' . esc_attr($purchase_cost) . '" class="regular-text" /></td></tr>';
@@ -255,7 +235,8 @@ class AMS_REST_API
 
     public function save_asset_meta($post_id)
     {
-        if (!isset($_POST['asset_meta_nonce']) || !wp_verify_nonce($_POST['asset_meta_nonce'], 'save_asset_meta')) {
+        // Security checks
+        if (!isset($_POST['asset_meta_nonce']) || !wp_verify_nonce(sanitize_text_field($_POST['asset_meta_nonce']), 'save_asset_meta')) {
             return;
         }
 
@@ -263,7 +244,7 @@ class AMS_REST_API
             return;
         }
 
-        if (isset($_POST['post_type']) && 'asset_item' == $_POST['post_type']) {
+        if (isset($_POST['post_type']) && sanitize_text_field($_POST['post_type']) == 'asset_item') {
             if (!current_user_can('edit_post', $post_id)) {
                 return;
             }
@@ -285,8 +266,20 @@ class AMS_REST_API
 
         foreach ($meta_fields as $field) {
             if (isset($_POST[$field])) {
-                // update_post_meta($post_id, '_' . $field, sanitize_text_field($_POST[$field]));
-                $value = sanitize_text_field($_POST[$field]);
+                $value = '';
+                
+                // Handle different field types with proper sanitization
+                switch ($field) {
+                    case 'notes':
+                        $value = sanitize_textarea_field($_POST[$field]);
+                        break;
+                    case 'purchase_cost':
+                        $value = floatval($_POST[$field]);
+                        break;
+                    default:
+                        $value = sanitize_text_field($_POST[$field]);
+                        break;
+                }
         
                 // Convert date fields from Y-m-d (HTML input format) to d-m-Y for storage
                 if (in_array($field, array('warranty_expiry', 'purchase_date')) && !empty($value)) {
@@ -299,26 +292,52 @@ class AMS_REST_API
     }
 
     /**
-     * Setup JWT Authentication
+     * Setup JWT Authentication with improved CORS
      */
     public function setup_jwt_authentication()
     {
         // Add JWT secret to wp-config.php
         if (!defined('JWT_AUTH_SECRET_KEY')) {
-            define('JWT_AUTH_SECRET_KEY', '0704648eaf0077561235cf4906d101e0');
+            define('JWT_AUTH_SECRET_KEY', wp_hash('ams-jwt-secret-' . AUTH_KEY));
         }
 
-        // Enable CORS
+        // Improved CORS handling
         add_action('rest_api_init', function () {
             remove_filter('rest_pre_serve_request', 'rest_send_cors_headers');
-            add_filter('rest_pre_serve_request', function ($value) {
-                header('Access-Control-Allow-Origin: *');
-                header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-                header('Access-Control-Allow-Headers: Authorization, Content-Type, X-WP-Nonce');
-                header('Access-Control-Allow-Credentials: true');
-                return $value;
-            });
-        }, 15);
+            add_filter('rest_pre_serve_request', array($this, 'handle_cors_headers'), 15);
+        });
+    }
+
+    /**
+     * Handle CORS headers with better security
+     */
+    public function handle_cors_headers($value)
+    {
+        $allowed_origins = array(
+            home_url(),
+            admin_url(),
+            // 'https://frontend-domain.com'
+        );
+
+        $origin = isset($_SERVER['HTTP_ORIGIN']) ? esc_url_raw($_SERVER['HTTP_ORIGIN']) : '';
+        
+        if (in_array($origin, $allowed_origins) || $this->is_development_environment()) {
+            header('Access-Control-Allow-Origin: ' . $origin);
+        }
+        
+        header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+        header('Access-Control-Allow-Headers: Authorization, Content-Type, X-WP-Nonce');
+        header('Access-Control-Allow-Credentials: true');
+        
+        return $value;
+    }
+
+    /**
+     * Check if we're in development environment
+     */
+    private function is_development_environment()
+    {
+        return defined('WP_DEBUG') && WP_DEBUG === true;
     }
 
     /**
@@ -410,12 +429,16 @@ class AMS_REST_API
     }
 
     /**
-     * Authentication Methods
+     * Authentication Methods using Firebase JWT
      */
     public function authenticate_user($request)
     {
         $username = sanitize_text_field($request->get_param('username'));
-        $password = sanitize_text_field($request->get_param('password'));
+        $password = $request->get_param('password'); // Don't sanitize passwords
+
+        if (empty($username) || empty($password)) {
+            return new WP_Error('missing_credentials', 'Username and password are required', array('status' => 400));
+        }
 
         $user = wp_authenticate($username, $password);
 
@@ -446,13 +469,12 @@ class AMS_REST_API
     {
         $token = $this->get_auth_token($request);
 
+        if (is_wp_error($token)) {
+            return $token;
+        }
+
         if (!$token) {
-            // return new WP_Error('missing_token', 'Authorization token is missing' , array('status' => 401));
-            return new WP_Error(
-                'missing_token',
-                'Authorization token is missing. Request params: ' . json_encode($request),
-                array('status' => 401)
-            );
+            return new WP_Error('missing_token', 'Authorization token is missing', array('status' => 401));
         }
 
         $user = $this->validate_jwt_token($token);
@@ -488,13 +510,13 @@ class AMS_REST_API
             ),
         );
 
-        return $this->jwt_encode($payload, JWT_AUTH_SECRET_KEY);
+        return JWT::encode($payload, JWT_AUTH_SECRET_KEY, 'HS256');
     }
 
     private function validate_jwt_token($token)
     {
         try {
-            $decoded = $this->jwt_decode($token, JWT_AUTH_SECRET_KEY);
+            $decoded = JWT::decode($token, new Key(JWT_AUTH_SECRET_KEY, 'HS256'));
             $user = get_user_by('id', $decoded->data->user->id);
 
             if (!$user || !in_array('administrator', $user->roles)) {
@@ -503,70 +525,31 @@ class AMS_REST_API
 
             return $user;
         } catch (Exception $e) {
-            return new WP_Error('invalid_token', 'Invalid token in validate_jwt_token', array('status' => 401));
+            return new WP_Error('invalid_token', 'Token validation failed: ' . $e->getMessage(), array('status' => 401));
         }
     }
 
-    // private function get_auth_token($request) {
-    //     $auth_header = $request->get_header('Authorization');
-
-    //     if (!$auth_header) {
-    //         return false;
-    //     }
-
-    //     list($bearer, $token) = explode(' ', $auth_header);
-
-    //     if ($bearer !== 'Bearer' || !$token) {
-    //         return false;
-    //     }
-
-    //     return $token;
-    // }
     private function get_auth_token($request)
     {
         $auth_header = $request->get_header('Authorization');
 
-        $debug = [
-            'headers' => $request->get_headers(),
-            'auth_header' => $auth_header,
-        ];
-
         if (!$auth_header) {
-            return new WP_Error(
-                'missing_authorization_header',
-                'Authorization header is missing',
-                ['status' => 401, 'debug' => $debug]
-            );
+            return new WP_Error('missing_authorization_header', 'Authorization header is missing', array('status' => 401));
         }
 
         $parts = explode(' ', $auth_header, 2);
         if (count($parts) !== 2) {
-            return new WP_Error(
-                'invalid_authorization_format',
-                'Authorization header format is invalid',
-                ['status' => 401, 'debug' => $debug]
-            );
+            return new WP_Error('invalid_authorization_format', 'Authorization header format is invalid', array('status' => 401));
         }
 
         list($bearer, $token) = $parts;
 
         if ($bearer !== 'Bearer' || empty($token)) {
-            return new WP_Error(
-                'invalid_bearer_token',
-                'Authorization must use Bearer scheme with a valid token',
-                ['status' => 401, 'debug' => $debug]
-            );
+            return new WP_Error('invalid_bearer_token', 'Authorization must use Bearer scheme with a valid token', array('status' => 401));
         }
-
-        // Optional: include token (truncated for security)
-        $debug['token_preview'] = substr($token, 0, 20) . '...';
-
-        // You could also attach debug info on success
-        // return ['token' => $token, 'debug' => $debug];
 
         return $token;
     }
-
 
     /**
      * Permission Callback
@@ -575,13 +558,12 @@ class AMS_REST_API
     {
         $token = $this->get_auth_token($request);
 
+        if (is_wp_error($token)) {
+            return $token;
+        }
+
         if (!$token) {
-            // return new WP_Error('missing_token', 'Authorization token is missing', array('status' => 401));
-            return new WP_Error(
-                'missing_token',
-                'Authorization token is missing. Request params: ' . json_encode($request),
-                array('status' => 401)
-            );
+            return new WP_Error('missing_token', 'Authorization token is missing', array('status' => 401));
         }
 
         $user = $this->validate_jwt_token($token);
@@ -594,95 +576,25 @@ class AMS_REST_API
     }
 
     /**
-     * Asset CRUD Operations
+     * Asset CRUD Operations with improved security
      */
-    // public function get_assets($request) {
-    //     $page = $request->get_param('page') ?: 1;
-    //     $per_page = $request->get_param('per_page') ?: 10;
-    //     $search = $request->get_param('search');
-    //     $status = $request->get_param('status');
-    //     $model = $request->get_param('model');
-    //     $rfid_tag = $request->get_param('rfid_tag');
-    //     $sort_by = $request->get_param('sort_by') ?: 'date';
-    //     $sort_order = $request->get_param('sort_order') ?: 'DESC';
-
-    //     $args = array(
-    //         'post_type' => 'asset_item',
-    //         'post_status' => 'publish',
-    //         'posts_per_page' => $per_page,
-    //         'paged' => $page,
-    //         'orderby' => $sort_by,
-    //         'order' => $sort_order,
-    //     );
-
-    //     // Add search
-    //     if ($search) {
-    //         $args['s'] = $search;
-    //     }
-
-    //     // Add meta query for filters
-    //     $meta_query = array();
-
-    //     if ($status) {
-    //         $meta_query[] = array(
-    //             'key' => '_status',
-    //             'value' => $status,
-    //             'compare' => '='
-    //         );
-    //     }
-
-    //     if ($model) {
-    //         $meta_query[] = array(
-    //             'key' => '_model',
-    //             'value' => $model,
-    //             'compare' => 'LIKE'
-    //         );
-    //     }
-
-    //     if ($rfid_tag) {
-    //         $meta_query[] = array(
-    //             'key' => '_rfid_tag',
-    //             'value' => $rfid_tag,
-    //             'compare' => 'LIKE'
-    //         );
-    //     }
-
-    //     if (count($meta_query) > 0) {
-    //         $args['meta_query'] = $meta_query;
-    //     }
-
-    //     $query = new WP_Query($args);
-    //     $assets = array();
-
-    //     foreach ($query->posts as $post) {
-    //         $assets[] = $this->format_asset_data($post);
-    //     }
-
-    //     return array(
-    //         'success' => true,
-    //         'data' => $assets,
-    //         'pagination' => array(
-    //             'current_page' => $page,
-    //             'per_page' => $per_page,
-    //             'total_items' => $query->found_posts,
-    //             'total_pages' => $query->max_num_pages,
-    //         ),
-    //     );
-    // }
-
-
     public function get_assets($request)
     {
-        $page = $request->get_param('page') ?: 1;
-        $per_page = $request->get_param('per_page') ?: 10;
-        $search = $request->get_param('search');
-        $status = $request->get_param('status');
-        $model = $request->get_param('model');
-        $rfid_tag = $request->get_param('rfid_tag');
-        $location = $request->get_param('location');
-        $assigned_to = $request->get_param('assigned_to');
-        $sort_by = $request->get_param('sort_by') ?: 'date';
-        $sort_order = $request->get_param('sort_order') ?: 'DESC';
+        global $wpdb;
+        
+        $page = max(1, intval($request->get_param('page') ?: 1));
+        $per_page = max(1, min(100, intval($request->get_param('per_page') ?: 10))); // Limit max per_page
+        $search = sanitize_text_field($request->get_param('search'));
+        $status = sanitize_text_field($request->get_param('status'));
+        $model = sanitize_text_field($request->get_param('model'));
+        $rfid_tag = sanitize_text_field($request->get_param('rfid_tag'));
+        $location = sanitize_text_field($request->get_param('location'));
+        $assigned_to = sanitize_text_field($request->get_param('assigned_to'));
+        $sort_by = sanitize_text_field($request->get_param('sort_by') ?: 'date');
+        $sort_order = strtoupper(sanitize_text_field($request->get_param('sort_order') ?: 'DESC'));
+        
+        // Validate sort_order
+        $sort_order = in_array($sort_order, array('ASC', 'DESC')) ? $sort_order : 'DESC';
 
         $args = array(
             'post_type' => 'asset_item',
@@ -692,25 +604,26 @@ class AMS_REST_API
             'order' => $sort_order,
         );
 
-        // Handle different sort types
-        $meta_sort_fields = array('model', 'serial_number', 'warranty_expiry');
+        // Handle different sort types securely
+        $allowed_sort_fields = array('date', 'title', 'model', 'serial_number', 'warranty_expiry', 'purchase_date', 'purchase_cost');
+        if (!in_array($sort_by, $allowed_sort_fields)) {
+            $sort_by = 'date';
+        }
+
+        $meta_sort_fields = array('model', 'serial_number', 'warranty_expiry', 'purchase_date', 'purchase_cost');
 
         if (in_array($sort_by, $meta_sort_fields)) {
-            // Sorting by meta field
             $args['meta_key'] = '_' . $sort_by;
             $args['orderby'] = 'meta_value';
 
-            // For date fields, use meta_value_datetime
             if (in_array($sort_by, array('warranty_expiry', 'purchase_date'))) {
                 $args['orderby'] = 'meta_value_datetime';
             }
 
-            // For numeric fields, use meta_value_num
             if (in_array($sort_by, array('purchase_cost'))) {
                 $args['orderby'] = 'meta_value_num';
             }
         } else {
-            // Default WordPress fields
             switch ($sort_by) {
                 case 'title':
                     $args['orderby'] = 'title';
@@ -722,44 +635,40 @@ class AMS_REST_API
             }
         }
 
-        // Add search
-        // if ($search) {
-        //     $args['s'] = $search;
-        // }
-
-        // Add meta query for filters
+        // Handle search and filters with prepared statements where needed
         $meta_query = array();
 
-        // Add search across metadata fields
         if ($search) {
-            // Add default WordPress search for post_title and post_content
-            $args['s'] = $search;
-
-            // Define metadata fields to search
-            $searchable_meta_fields = array(
-                '_asset_tag',
-                '_serial_number',
-                '_assigned_to',
-                '_title',
-            );
-
-            // Create meta_query for search
-            $search_meta_query = array(
-                'relation' => 'OR',
-            );
-
-            foreach ($searchable_meta_fields as $meta_key) {
-                $search_meta_query[] = array(
-                    'key' => $meta_key,
-                    'value' => $search,
-                    'compare' => 'LIKE',
-                );
+            // For search, we'll use a more secure approach
+            $search_args = $args;
+            $search_args['s'] = $search;
+            
+            // Also search in metadata using prepared statements
+            $meta_search_ids = $wpdb->get_col($wpdb->prepare("
+                SELECT DISTINCT post_id 
+                FROM {$wpdb->postmeta} 
+                WHERE (meta_key = '_asset_tag' OR meta_key = '_serial_number' OR meta_key = '_assigned_to' OR meta_key = '_location') 
+                AND meta_value LIKE %s
+            ", '%' . $wpdb->esc_like($search) . '%'));
+            
+            if (!empty($meta_search_ids)) {
+                $title_query = new WP_Query($search_args);
+                $combined_ids = array_unique(array_merge(wp_list_pluck($title_query->posts, 'ID'), $meta_search_ids));
+                
+                if (!empty($combined_ids)) {
+                    $args['post__in'] = array_map('intval', $combined_ids);
+                    $args['posts_per_page'] = -1;
+                    $total_found = count($combined_ids);
+                } else {
+                    $args['post__in'] = array(0);
+                    $total_found = 0;
+                }
+            } else {
+                $args['s'] = $search;
             }
-
-            // Add search meta_query to main meta_query
-            $meta_query[] = $search_meta_query;
         }
 
+        // Add other filters to meta_query
         if ($status) {
             $meta_query[] = array(
                 'key' => '_status',
@@ -801,61 +710,71 @@ class AMS_REST_API
         }
 
         if (count($meta_query) > 0) {
-            $args['meta_query'] = $meta_query;
-
-            // If we have multiple meta queries, set relation
-            if (count($meta_query) > 1) {
-                $args['meta_query']['relation'] = 'AND';
-            }
+            $args['meta_query'] = array(
+                'relation' => 'AND',
+                ...$meta_query
+            );
         }
 
         $query = new WP_Query($args);
         $assets = array();
 
-        foreach ($query->posts as $post) {
-            $assets[] = $this->format_asset_data($post);
+        // Handle pagination for search results
+        if ($search && isset($total_found)) {
+            $all_posts = $query->posts;
+            $offset = ($page - 1) * $per_page;
+            $paged_posts = array_slice($all_posts, $offset, $per_page);
+            
+            foreach ($paged_posts as $post) {
+                $assets[] = $this->format_asset_data($post);
+            }
+            
+            $pagination = array(
+                'current_page' => $page,
+                'per_page' => $per_page,
+                'total_items' => $total_found,
+                'total_pages' => ceil($total_found / $per_page),
+            );
+        } else {
+            foreach ($query->posts as $post) {
+                $assets[] = $this->format_asset_data($post);
+            }
+            
+            $pagination = array(
+                'current_page' => $page,
+                'per_page' => $per_page,
+                'total_items' => $query->found_posts,
+                'total_pages' => $query->max_num_pages,
+            );
         }
-
-        // Optional: Add custom sorting for complex cases (if needed)
-        // if (!in_array($sort_by, array_merge($meta_sort_fields, array('title', 'date')))) {
-        //     // Custom sorting logic for special cases
-        //     switch ($sort_by) {
-        //         case 'status_priority':
-        //             // Example: Custom status priority sorting
-        //             $status_priority = array('new' => 1, 'staging' => 2, 'ready' => 3, 'assigned' => 4, 'maintenance' => 5, 'defected' => 6, 'archived' => 7, 'disposed' => 8);
-        //             usort($assets, function ($a, $b) use ($status_priority, $sort_order) {
-        //                 $a_priority = $status_priority[$a['status']] ?? 999;
-        //                 $b_priority = $status_priority[$b['status']] ?? 999;
-
-        //                 if ($sort_order === 'ASC') {
-        //                     return $a_priority <=> $b_priority;
-        //                 } else {
-        //                     return $b_priority <=> $a_priority;
-        //                 }
-        //             });
-        //             break;
-        //     }
-        // }
 
         return array(
             'success' => true,
             'data' => $assets,
-            'pagination' => array(
-                'current_page' => (int) $page,
-                'per_page' => (int) $per_page,
-                'total_items' => $query->found_posts,
-                'total_pages' => $query->max_num_pages,
-            ),
+            'pagination' => $pagination,
             'sort' => array(
                 'sort_by' => $sort_by,
                 'sort_order' => $sort_order,
+            ),
+            'filters_applied' => array(
+                'search' => $search,
+                'status' => $status,
+                'model' => $model,
+                'rfid_tag' => $rfid_tag,
+                'location' => $location,
+                'assigned_to' => $assigned_to,
             ),
         );
     }
 
     public function get_asset($request)
     {
-        $id = $request->get_param('id');
+        $id = intval($request->get_param('id'));
+        
+        if ($id <= 0) {
+            return new WP_Error('invalid_id', 'Invalid asset ID', array('status' => 400));
+        }
+        
         $post = get_post($id);
 
         if (!$post || $post->post_type !== 'asset_item') {
@@ -870,15 +789,26 @@ class AMS_REST_API
 
     public function create_asset($request)
     {
-        $data = json_decode($request->get_body(), true);
+        $raw_data = $request->get_body();
+        
+        if (empty($raw_data)) {
+            return new WP_Error('empty_data', 'Request body is empty', array('status' => 400));
+        }
 
-        if (!$data) {
-            return new WP_Error('invalid_data', 'Invalid JSON data', array('status' => 400));
+        $data = json_decode($raw_data, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return new WP_Error('invalid_json', 'Invalid JSON data: ' . json_last_error_msg(), array('status' => 400));
+        }
+
+        // Validate required fields
+        if (empty($data['title'])) {
+            return new WP_Error('missing_title', 'Asset title is required', array('status' => 400));
         }
 
         $post_data = array(
             'post_type' => 'asset_item',
-            'post_title' => sanitize_text_field($data['title'] ?? 'New Asset'),
+            'post_title' => sanitize_text_field($data['title']),
             'post_content' => sanitize_textarea_field($data['description'] ?? ''),
             'post_status' => 'publish',
         );
@@ -901,11 +831,21 @@ class AMS_REST_API
 
     public function update_asset($request)
     {
-        $id = $request->get_param('id');
-        $data = json_decode($request->get_body(), true);
+        $id = intval($request->get_param('id'));
+        $raw_data = $request->get_body();
+        
+        if ($id <= 0) {
+            return new WP_Error('invalid_id', 'Invalid asset ID', array('status' => 400));
+        }
+        
+        if (empty($raw_data)) {
+            return new WP_Error('empty_data', 'Request body is empty', array('status' => 400));
+        }
 
-        if (!$data) {
-            return new WP_Error('invalid_data', 'Invalid JSON data', array('status' => 400));
+        $data = json_decode($raw_data, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return new WP_Error('invalid_json', 'Invalid JSON data: ' . json_last_error_msg(), array('status' => 400));
         }
 
         $post = get_post($id);
@@ -916,9 +856,15 @@ class AMS_REST_API
 
         $post_data = array(
             'ID' => $id,
-            'post_title' => sanitize_text_field($data['title'] ?? $post->post_title),
-            'post_content' => sanitize_textarea_field($data['description'] ?? $post->post_content),
         );
+        
+        if (isset($data['title'])) {
+            $post_data['post_title'] = sanitize_text_field($data['title']);
+        }
+        
+        if (isset($data['description'])) {
+            $post_data['post_content'] = sanitize_textarea_field($data['description']);
+        }
 
         $result = wp_update_post($post_data);
 
@@ -938,7 +884,12 @@ class AMS_REST_API
 
     public function delete_asset($request)
     {
-        $id = $request->get_param('id');
+        $id = intval($request->get_param('id'));
+        
+        if ($id <= 0) {
+            return new WP_Error('invalid_id', 'Invalid asset ID', array('status' => 400));
+        }
+        
         $post = get_post($id);
 
         if (!$post || $post->post_type !== 'asset_item') {
@@ -959,32 +910,58 @@ class AMS_REST_API
 
     public function bulk_deploy_assets($request)
     {
-        $data = json_decode($request->get_body(), true);
+        $raw_data = $request->get_body();
+        
+        if (empty($raw_data)) {
+            return new WP_Error('empty_data', 'Request body is empty', array('status' => 400));
+        }
+
+        $data = json_decode($raw_data, true);
+        
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return new WP_Error('invalid_json', 'Invalid JSON data: ' . json_last_error_msg(), array('status' => 400));
+        }
+        
         $asset_ids = $data['asset_ids'] ?? array();
 
-        if (empty($asset_ids)) {
-            return new WP_Error('missing_assets', 'No assets specified for bulk deploy', array('status' => 400));
+        if (empty($asset_ids) || !is_array($asset_ids)) {
+            return new WP_Error('missing_assets', 'No valid assets specified for bulk deploy', array('status' => 400));
         }
 
         $updated_count = 0;
+        $errors = array();
 
         foreach ($asset_ids as $asset_id) {
+            $asset_id = intval($asset_id);
+            
+            if ($asset_id <= 0) {
+                $errors[] = "Invalid asset ID: $asset_id";
+                continue;
+            }
+            
             $post = get_post($asset_id);
             if ($post && $post->post_type === 'asset_item') {
-                update_post_meta($asset_id, '_status', 'assigned');
-                $updated_count++;
+                $result = update_post_meta($asset_id, '_status', 'ready');
+                if ($result !== false) {
+                    $updated_count++;
+                } else {
+                    $errors[] = "Failed to update asset ID: $asset_id";
+                }
+            } else {
+                $errors[] = "Asset not found: $asset_id";
             }
         }
 
         return array(
-            'success' => true,
-            'message' => sprintf('%d assets assigned successfully', $updated_count),
+            'success' => empty($errors),
+            'message' => sprintf('%d assets updated successfully', $updated_count),
             'updated_count' => $updated_count,
+            'errors' => $errors,
         );
     }
 
     /**
-     * Metadata Methods
+     * Metadata Methods with improved security
      */
     public function get_statuses($request)
     {
@@ -994,7 +971,6 @@ class AMS_REST_API
                 'new' => 'New',
                 'staging' => 'Staging',
                 'ready' => 'Ready to Deploy',
-                // 'assigned' => 'assigned',
                 'defected' => 'Defected',
                 'maintenance' => 'Under Maintenance',
                 'archived' => 'Archived',
@@ -1008,17 +984,21 @@ class AMS_REST_API
     {
         global $wpdb;
 
-        $models = $wpdb->get_col("
-            SELECT DISTINCT meta_value 
-            FROM {$wpdb->postmeta} 
-            WHERE meta_key = '_model' 
-            AND meta_value != '' 
-            ORDER BY meta_value ASC
-        ");
+        $models = $wpdb->get_col($wpdb->prepare("
+            SELECT DISTINCT pm.meta_value 
+            FROM {$wpdb->postmeta} pm
+            INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID
+            WHERE pm.meta_key = %s 
+            AND pm.meta_value != '' 
+            AND p.post_type = %s
+            AND p.post_status = %s
+            ORDER BY pm.meta_value ASC
+            LIMIT 100
+        ", '_model', 'asset_item', 'publish'));
 
         return array(
             'success' => true,
-            'data' => $models,
+            'data' => array_map('sanitize_text_field', $models),
         );
     }
 
@@ -1026,17 +1006,21 @@ class AMS_REST_API
     {
         global $wpdb;
 
-        $locations = $wpdb->get_col("
-            SELECT DISTINCT meta_value 
-            FROM {$wpdb->postmeta} 
-            WHERE meta_key = '_location' 
-            AND meta_value != '' 
-            ORDER BY meta_value ASC
-        ");
+        $locations = $wpdb->get_col($wpdb->prepare("
+            SELECT DISTINCT pm.meta_value 
+            FROM {$wpdb->postmeta} pm
+            INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID
+            WHERE pm.meta_key = %s 
+            AND pm.meta_value != '' 
+            AND p.post_type = %s
+            AND p.post_status = %s
+            ORDER BY pm.meta_value ASC
+            LIMIT 100
+        ", '_location', 'asset_item', 'publish'));
 
         return array(
             'success' => true,
-            'data' => $locations,
+            'data' => array_map('sanitize_text_field', $locations),
         );
     }
 
@@ -1044,17 +1028,21 @@ class AMS_REST_API
     {
         global $wpdb;
 
-        $locations = $wpdb->get_col("
-            SELECT DISTINCT meta_value 
-            FROM {$wpdb->postmeta} 
-            WHERE meta_key = '_assigned_to' 
-            AND meta_value != '' 
-            ORDER BY meta_value ASC
-        ");
+        $assigned = $wpdb->get_col($wpdb->prepare("
+            SELECT DISTINCT pm.meta_value 
+            FROM {$wpdb->postmeta} pm
+            INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID
+            WHERE pm.meta_key = %s 
+            AND pm.meta_value != '' 
+            AND p.post_type = %s
+            AND p.post_status = %s
+            ORDER BY pm.meta_value ASC
+            LIMIT 100
+        ", '_assigned_to', 'asset_item', 'publish'));
 
         return array(
             'success' => true,
-            'data' => $locations,
+            'data' => array_map('sanitize_text_field', $assigned),
         );
     }
 
@@ -1078,21 +1066,27 @@ class AMS_REST_API
         );
 
         $asset_data = array(
-            'id' => $post->ID,
-            'title' => $post->post_title,
-            'description' => $post->post_content,
+            'id' => intval($post->ID),
+            'title' => sanitize_text_field($post->post_title),
+            'description' => sanitize_textarea_field($post->post_content),
             'date_created' => $this->format_date($post->post_date),
             'date_modified' => $this->format_date($post->post_modified),
         );
 
         foreach ($meta_fields as $field) {
-            $asset_data[$field] = get_post_meta($post->ID, '_' . $field, true);
-            // Format specific date fields
-            // if (in_array($field, ['purchase_date', 'warranty_expiry']) && !empty($value)) {
-            //     $asset_data[$field] = $this->format_date($value);
-            // } else {
-            //     $asset_data[$field] = $value;
-            // }
+            $value = get_post_meta($post->ID, '_' . $field, true);
+            
+            switch ($field) {
+                case 'notes':
+                    $asset_data[$field] = sanitize_textarea_field($value);
+                    break;
+                case 'purchase_cost':
+                    $asset_data[$field] = floatval($value);
+                    break;
+                default:
+                    $asset_data[$field] = sanitize_text_field($value);
+                    break;
+            }
         }
 
         return $asset_data;
@@ -1107,11 +1101,10 @@ class AMS_REST_API
             return '';
         }
 
-        // Handle different date formats
         $timestamp = strtotime($date_string);
 
         if ($timestamp === false) {
-            return $date_string; // Return original if can't parse
+            return sanitize_text_field($date_string);
         }
 
         return date('d-m-Y', $timestamp);
@@ -1120,71 +1113,54 @@ class AMS_REST_API
     private function save_asset_meta_from_api($post_id, $data)
     {
         $meta_fields = array(
-            'asset_tag',
-            'model',
-            'serial_number',
-            'status',
-            'assigned_to',
-            'location',
-            'rfid_tag',
-            'warranty_expiry',
-            'notes',
-            'purchase_date',
-            'purchase_cost'
+            'asset_tag' => 'text',
+            'model' => 'text',
+            'serial_number' => 'text',
+            'status' => 'text',
+            'assigned_to' => 'text',
+            'location' => 'text',
+            'rfid_tag' => 'text',
+            'warranty_expiry' => 'date',
+            'notes' => 'textarea',
+            'purchase_date' => 'date',
+            'purchase_cost' => 'number'
         );
 
-        foreach ($meta_fields as $field) {
+        // Validate status if provided
+        $allowed_statuses = array('new', 'staging', 'ready', 'defected', 'maintenance', 'archived', 'disposed', 'return');
+
+        foreach ($meta_fields as $field => $type) {
             if (isset($data[$field])) {
-                update_post_meta($post_id, '_' . $field, sanitize_text_field($data[$field]));
+                $value = $data[$field];
+                
+                // Type-specific validation and sanitization
+                switch ($type) {
+                    case 'textarea':
+                        $value = sanitize_textarea_field($value);
+                        break;
+                    case 'number':
+                        $value = floatval($value);
+                        break;
+                    case 'date':
+                        $value = sanitize_text_field($value);
+                        // Validate date format if not empty
+                        if (!empty($value) && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) && !preg_match('/^\d{2}-\d{2}-\d{4}$/', $value)) {
+                            continue 2; // Skip this field if invalid date format
+                        }
+                        break;
+                    default:
+                        $value = sanitize_text_field($value);
+                        break;
+                }
+                
+                // Additional validation for specific fields
+                if ($field === 'status' && !empty($value) && !in_array($value, $allowed_statuses)) {
+                    continue; // Skip invalid status
+                }
+                
+                update_post_meta($post_id, '_' . $field, $value);
             }
         }
-    }
-
-    /**
-     * Simple JWT Implementation (for production, use Firebase JWT library)
-     */
-    private function jwt_encode($payload, $key)
-    {
-        $header = json_encode(array('typ' => 'JWT', 'alg' => 'HS256'));
-        $payload = json_encode($payload);
-
-        $base64Header = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($header));
-        $base64Payload = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($payload));
-
-        $signature = hash_hmac('sha256', $base64Header . "." . $base64Payload, $key, true);
-        $base64Signature = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($signature));
-
-        return $base64Header . "." . $base64Payload . "." . $base64Signature;
-    }
-
-    private function jwt_decode($jwt, $key)
-    {
-        if (!is_string($jwt) || empty($jwt)) {
-            throw new Exception('Invalid JWT input: expected string, got ' . gettype($jwt));
-        }
-
-        $parts = explode('.', $jwt);
-
-        if (count($parts) != 3) {
-            throw new Exception('Invalid token');
-        }
-
-        list($base64Header, $base64Payload, $base64Signature) = $parts;
-
-        $signature = base64_decode(str_replace(['-', '_'], ['+', '/'], $base64Signature));
-        $expectedSignature = hash_hmac('sha256', $base64Header . "." . $base64Payload, $key, true);
-
-        if (!hash_equals($signature, $expectedSignature)) {
-            throw new Exception('Invalid signature');
-        }
-
-        $payload = json_decode(base64_decode(str_replace(['-', '_'], ['+', '/'], $base64Payload)));
-
-        if ($payload->exp < time()) {
-            throw new Exception('Token expired');
-        }
-
-        return $payload;
     }
 
     public function enqueue_scripts()
@@ -1193,28 +1169,25 @@ class AMS_REST_API
     }
 
     /**
-     * On admin login, set JWT token cookie (ams_token)
+     * On admin login, set JWT token cookie (ams_token) - Improved version
      */
     public function set_admin_token_cookie($user_login, $user)
     {
         if (in_array('administrator', (array) $user->roles)) {
             $token = $this->generate_jwt_token($user);
 
-            // More explicit cookie settings
             $cookie_options = array(
                 'expires' => time() + (24 * 60 * 60), // 24h expiry
                 'path' => '/',
-                'domain' => '', // Let it use the current domain
-                'secure' => is_ssl(), // Only on HTTPS if available
-                'httponly' => false, // Allow JavaScript access
-                'samesite' => 'Lax' // Allow cross-site requests
+                'domain' => parse_url(home_url(), PHP_URL_HOST),
+                'secure' => is_ssl(),
+                'httponly' => false, // Allow JavaScript access for API calls
+                'samesite' => 'Lax'
             );
 
-            // Set cookie using setcookie with options array (PHP 7.3+)
             if (version_compare(PHP_VERSION, '7.3.0', '>=')) {
                 setcookie('ams_token', $token, $cookie_options);
             } else {
-                // Fallback for older PHP versions
                 setcookie(
                     'ams_token',
                     $token,
@@ -1226,11 +1199,13 @@ class AMS_REST_API
                 );
             }
 
-            // Debug log
-            error_log('AMS Token cookie set for user: ' . $user->user_login);
-            error_log('Token preview: ' . substr($token, 0, 20) . '...');
+            // Log for debugging (remove in production)
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('AMS Token cookie set for user: ' . sanitize_text_field($user->user_login));
+            }
         }
     }
+
     /**
      * Convert date from d-m-Y (storage format) to Y-m-d (HTML input format)
      */
@@ -1251,7 +1226,7 @@ class AMS_REST_API
             return $date->format('Y-m-d');
         }
 
-        return $date_string; // Return original if can't parse
+        return sanitize_text_field($date_string);
     }
 
     /**
@@ -1274,7 +1249,25 @@ class AMS_REST_API
             return $date->format('d-m-Y');
         }
 
-        return $date_string; // Return original if can't parse
+        return sanitize_text_field($date_string);
+    }
+
+    /**
+     * Rate limiting for API endpoints
+     */
+    private function check_rate_limit($user_id, $endpoint)
+    {
+        $transient_key = 'ams_rate_limit_' . $user_id . '_' . md5($endpoint);
+        $requests = get_transient($transient_key) ?: 0;
+        
+        $rate_limit = 100; // requests per hour
+        
+        if ($requests >= $rate_limit) {
+            return new WP_Error('rate_limit_exceeded', 'Rate limit exceeded', array('status' => 429));
+        }
+        
+        set_transient($transient_key, $requests + 1, HOUR_IN_SECONDS);
+        return true;
     }
 }
 
@@ -1291,22 +1284,27 @@ function ams_api_activate()
     // Flush rewrite rules
     flush_rewrite_rules();
 
-    // Create default categories, manufacturers, and locations
-    $default_categories = array('Computers', 'Printers', 'Furniture', 'Appliances');
-    $default_manufacturers = array('Dell', 'HP', 'Lenovo', 'Samsung', 'Epson');
-    $default_locations = array('IT Room', 'Office 3', 'Office 4', 'Kitchen', 'Store A', 'Store B', 'Store C');
-
-    foreach ($default_categories as $category) {
-        wp_insert_term($category, 'asset_category');
-    }
-
-    // foreach ($default_manufacturers as $manufacturer) {
-    //     wp_insert_term($manufacturer, 'asset_manufacturer');
-    // }
+    // Create default locations with proper sanitization
+    $default_locations = array(
+        'IT Room', 
+        'Office 3', 
+        'Office 4', 
+        'Kitchen', 
+        'Store A', 
+        'Store B', 
+        'Store C'
+    );
 
     foreach ($default_locations as $location) {
-        wp_insert_term($location, 'asset_location');
+        $sanitized_location = sanitize_text_field($location);
+        if (!term_exists($sanitized_location, 'asset_location')) {
+            wp_insert_term($sanitized_location, 'asset_location');
+        }
     }
+
+    // Set default options
+    update_option('ams_api_version', '2.1.0');
+    update_option('ams_api_activated', current_time('mysql'));
 }
 
 /**
@@ -1317,4 +1315,30 @@ register_deactivation_hook(__FILE__, 'ams_api_deactivate');
 function ams_api_deactivate()
 {
     flush_rewrite_rules();
+    
+    // Clean up transients
+    global $wpdb;
+    $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_ams_rate_limit_%'");
+    $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_timeout_ams_rate_limit_%'");
+}
+
+/**
+ * Additional Security Functions
+ */
+
+/**
+ * Log security events
+ */
+function ams_log_security_event($event, $details = array()) {
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        $log_entry = array(
+            'timestamp' => current_time('mysql'),
+            'event' => sanitize_text_field($event),
+            'details' => $details,
+            'user_ip' => sanitize_text_field($_SERVER['REMOTE_ADDR'] ?? 'unknown'),
+            'user_agent' => sanitize_text_field($_SERVER['HTTP_USER_AGENT'] ?? 'unknown')
+        );
+        
+        error_log('AMS Security Event: ' . json_encode($log_entry));
+    }
 }

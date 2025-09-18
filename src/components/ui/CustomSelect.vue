@@ -69,7 +69,7 @@ const selectedLabel = computed(() => {
 
 function toggleOpen(event: MouseEvent) {
   // if (props.disabled) {
-  //   console.log('Debug: Select is disabled, ignoring toggle',event);
+    console.log('Debug: Select is disabled, ignoring toggle',event);
   //   return;
   // }
   // isOpen.value = !isOpen.value;
@@ -79,7 +79,7 @@ function toggleOpen(event: MouseEvent) {
   //   highlightedIndex.value = -1;
   // }
   if (props.disabled) {
-    console.log('Debug: Select is disabled, ignoring toggle', event);
+    // console.log('Debug: Select is disabled, ignoring toggle', event);
     return;
   }
   

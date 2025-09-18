@@ -157,7 +157,7 @@ function sortBy(column: string) {
   if (props.currentSortBy === column) {
     newOrder = props.currentSortOrder === 'ASC' ? 'DESC' : 'ASC'
   }
-  console.log(`Sorting by ${column} in ${newOrder} order`)
+  // console.log(`Sorting by ${column} in ${newOrder} order`)
   
   emit('sort', column, newOrder)
 }
@@ -175,7 +175,7 @@ function getSortIconClass(column: string) {
 function copyToClipboard(text: string) {
   if (navigator.clipboard && window.isSecureContext) {
     navigator.clipboard.writeText(text).then(() => {
-      console.log(`Copied to clipboard: ${text}`)
+      // console.log(`Copied to clipboard: ${text}`)
       // You could show a toast notification here
     }).catch(err => {
       console.error('Failed to copy to clipboard:', err)
@@ -196,7 +196,7 @@ function fallbackCopy(text: string) {
   
   try {
     document.execCommand('copy')
-    console.log(`Copied to clipboard: ${text}`)
+    // console.log(`Copied to clipboard: ${text}`)
   } catch (err) {
     console.error('Fallback copy failed:', err)
   }

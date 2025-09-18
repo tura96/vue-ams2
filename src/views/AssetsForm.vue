@@ -400,12 +400,12 @@ async function initializeFlatpickr() {
         onChange: (selectedDates: Date[], dateStr: string) => {
           asset.purchase_date = dateStr
           console.log('Selected purchase_date:', selectedDates)
-          if (import.meta.env.DEV) console.log('purchase_date updated:', dateStr)
+          // if (import.meta.env.DEV) console.log('purchase_date updated:', dateStr)
         }
       })
       if (asset.purchase_date) {
         purchaseDatePicker.setDate(asset.purchase_date, true, 'd-m-Y')
-        if (import.meta.env.DEV) console.log('Set purchase_date:', asset.purchase_date)
+        // if (import.meta.env.DEV) console.log('Set purchase_date:', asset.purchase_date)
       }
     } catch (err) {
       console.error('Failed to initialize purchase_date flatpickr:', err)

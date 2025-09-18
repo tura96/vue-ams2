@@ -46,12 +46,12 @@
   />
 
   <!-- Error/Success Messages -->
-  <!-- <div v-if="errorMessage" class="error-message">
+  <div v-if="errorMessage" class="error-message">
     {{ errorMessage }}
   </div>
   <div v-if="successMessage" class="success-message">
     {{ successMessage }}
-  </div> -->
+  </div>
 
 </template>
 
@@ -147,7 +147,7 @@ const selectedAssetsDataComputed = computed(() => {
 watch(
   () => [props.assets, props.selectedAssets],
   () => {
-    if (import.meta.env.DEV) console.log('props.assets:', props.assets)
+    // if (import.meta.env.DEV) console.log('props.assets:', props.assets)
 
     selectedAssetsData.value = selectedAssetsDataComputed.value
   },
@@ -187,7 +187,7 @@ function openBulkDeployModal() {
     setTimeout(() => (errorMessage.value = null), 3000)
     return
   }
-  console.log('Opening Bulk Deploy Modal with assets:', selectedAssetsData.value)
+  // console.log('Opening Bulk Deploy Modal with assets:', selectedAssetsData.value)
   bulkDeployModal.value.isOpen = true
 }
 
@@ -236,4 +236,14 @@ async function confirmBulkDeploy(deployData: BulkDeployData) {
 
 <style scoped lang="scss">
 @use "/src/assets/styles/components/table.scss";
+.error-message{
+  text-align: center;
+  color: red;
+  padding: 12px;
+}
+.success-message{
+  text-align: center;
+  color: green;
+  padding: 12px;
+}
 </style>

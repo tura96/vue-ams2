@@ -57,7 +57,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import AssetFilters from '@/components/assets/AssetFilters.vue'
 import AssetTable from '@/components/assets/AssetTable.vue'
@@ -117,7 +117,6 @@ const deleteModal = ref({
 })
 
 const router = useRouter()
-const route = useRoute()
 const authStore = useAuthStore()
 
 
@@ -212,8 +211,8 @@ async function loadAssets() {
       totalItems.value = response.pagination?.total_items || 0
       totalPages.value = response.pagination?.total_pages || 0
       
-      console.log('Fetched assets:', assets.value)
-      console.log('Pagination:', response.pagination)
+      // console.log('Fetched assets:', assets.value)
+      // console.log('Pagination:', response.pagination)
     } else {
       throw new Error('Failed to fetch assets')
     }
@@ -335,7 +334,7 @@ onMounted(async () => {
     loadAssets()
   ])
   
-  console.log('Route data:', route)
+  // console.log('Route data:', route)
 })
 </script>
 

@@ -77,15 +77,15 @@ router.beforeEach(async (to) => {
       
       // Debug logging
       if (import.meta.env.DEV) {
-        console.log('Fetching asset with ID:', assetId)
-        console.log('Asset store:', assetStore)
+        // console.log('Fetching asset with ID:', assetId)
+        // console.log('Asset store:', assetStore)
       }
       
       const asset = await assetStore.fetchAssetTitle(assetId)
       
       if (import.meta.env.DEV) {
-        console.log('Fetched asset result:', asset)
-        console.log('Asset type:', typeof asset)
+        // console.log('Fetched asset result:', asset)
+        // console.log('Asset type:', typeof asset)
       }
       
       if (asset) {
